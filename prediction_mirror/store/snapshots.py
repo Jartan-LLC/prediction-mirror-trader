@@ -67,6 +67,21 @@ def get_all_snapshots(
     return [_row_to_target_position(row) for row in rows]
 
 
+def delete_snapshot(
+    conn: sqlite3.Connection,
+    target_address: str,
+    platform: str,
+    market_id: str,
+    asset_id: str,
+) -> None:
+    conn.execute(
+        "DELETE FROM target_snapshots "
+        "WHERE target_address = ? AND platform = ? AND market_id = ? AND asset_id = ?",
+        (target_address, platform, market_id, asset_id),
+    )
+    conn.commit()
+
+
 def delete_stale_snapshots(conn: sqlite3.Connection, older_than: datetime) -> int:
     cursor = conn.execute(
         "DELETE FROM target_snapshots WHERE snapshot_time < ?",

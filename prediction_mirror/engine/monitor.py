@@ -111,8 +111,16 @@ async def poll_target(
     old_positions = store.get_all_snapshots(target.address)
     signals = diff_positions(old_positions, new_positions, target)
 
-    # Update snapshots
+    # Update snapshots — upsert current positions and remove exited ones
+    new_keys = {(pos.market_id, pos.asset_id) for pos in new_positions}
     for pos in new_positions:
         store.upsert_snapshot(pos)
+    for old_pos in old_positions:
+        if (old_pos.market_id, old_pos.asset_id) not in new_keys:
+            # Position disappeared — delete the stale snapshot so we don't
+            # generate the same SELL signal on every subsequent poll
+            from prediction_mirror.store.snapshots import delete_snapshot
+            delete_snapshot(store.conn, old_pos.target_address, old_pos.platform,
+                           old_pos.market_id, old_pos.asset_id)
 
     return signals
