@@ -12,7 +12,7 @@ from prediction_mirror.utils.conversions import (
     usdc_to_raw,
 )
 from prediction_mirror.utils.formatting import fmt_address, fmt_pct, fmt_timestamp, fmt_usd
-from prediction_mirror.utils.log import configure_logging, get_logger
+from prediction_mirror.utils.log import configure_logging
 
 
 # ── Formatting ──
@@ -124,9 +124,14 @@ class TestClamp:
 
 
 class TestLogging:
-    def test_get_logger_prefix(self):
-        logger = get_logger("monitor")
-        assert logger.name == "prediction_mirror.monitor"
+    def test_standard_logger_hierarchy(self):
+        root = logging.getLogger("prediction_mirror")
+        child = logging.getLogger("prediction_mirror.engine.monitor")
+        # Child logger is under the prediction_mirror namespace
+        assert child.name.startswith("prediction_mirror.")
+        # Effective level inherits from root when not set directly
+        root.setLevel(logging.WARNING)
+        assert child.getEffectiveLevel() == logging.WARNING
 
     def test_configure_logging(self, tmp_path, monkeypatch):
         # Avoid polluting the working directory with log files
@@ -160,7 +165,6 @@ class TestReExports:
             fmt_pct,
             fmt_timestamp,
             fmt_usd,
-            get_logger,
             raw_to_usdc,
             usdc_to_raw,
         )
@@ -174,7 +178,6 @@ class TestReExports:
                 fmt_pct,
                 fmt_timestamp,
                 fmt_usd,
-                get_logger,
                 raw_to_usdc,
                 usdc_to_raw,
             ]

@@ -5,11 +5,11 @@ from datetime import datetime, timezone
 import httpx
 
 from prediction_mirror.models.position import TargetPosition
+import logging
+
 from prediction_mirror.platforms.errors import FatalError, TransientError
 from prediction_mirror.platforms.polymarket.config import DATA_API_URL
-from prediction_mirror.utils.log import get_logger
-
-logger = get_logger("polymarket.data_api")
+logger = logging.getLogger(__name__)
 
 
 def _classify_http_error(status_code: int, detail: str = "") -> None:

@@ -26,6 +26,3 @@ def configure_logging(level: str = "INFO") -> None:
     file_handler.setFormatter(logging.Formatter(LOG_FORMAT))
     root.addHandler(file_handler)
 
-
-def get_logger(name: str) -> logging.Logger:
-    return logging.getLogger(f"prediction_mirror.{name}")

@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
+import logging
+
 from prediction_mirror.platforms.errors import FatalError, TransientError
 from prediction_mirror.platforms.polymarket.config import (
     CONDITIONAL_TOKENS,
@@ -10,9 +12,7 @@ from prediction_mirror.platforms.polymarket.config import (
     USDC_ADDRESS,
     USDC_DECIMALS,
 )
-from prediction_mirror.utils.log import get_logger
-
-logger = get_logger("polymarket.blockchain")
+logger = logging.getLogger(__name__)
 
 # Minimal ABIs for the operations we need
 ERC20_ABI = [

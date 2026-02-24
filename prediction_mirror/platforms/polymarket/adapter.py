@@ -17,9 +17,9 @@ from prediction_mirror.platforms.polymarket.config import (
     load_private_key,
     load_rpc_url,
 )
-from prediction_mirror.utils.log import get_logger
+import logging
 
-logger = get_logger("polymarket.adapter")
+logger = logging.getLogger(__name__)
 
 
 class PolymarketAdapter(PlatformAdapter):
