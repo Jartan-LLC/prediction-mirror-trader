@@ -57,11 +57,10 @@ class DashboardListener:
         recent_trades = self._store.get_recent_trades(limit=10)
 
         if settings.dry_run:
-            portfolio_value = (
-                settings.dry_run_balance_usd
-                + self._store.get_total_deployed(dry_run=True)
-            )
+            portfolio_value = settings.dry_run_balance_usd
         else:
+            # Real mode: liquid balance would come from wallet state,
+            # but for dashboard we approximate from deployed
             portfolio_value = self._store.get_total_deployed(dry_run=False)
         allocation = self._store.get_allocation_summary(
             targets, portfolio_value, dry_run=settings.dry_run,

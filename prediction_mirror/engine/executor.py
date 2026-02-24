@@ -70,10 +70,9 @@ async def _process_signal(
 
     # Calculate portfolio value
     if settings.dry_run:
-        portfolio_value = (
-            settings.dry_run_balance_usd
-            + store.get_total_deployed(dry_run=True)
-        )
+        # dry_run_balance_usd IS the total portfolio — deployed capital
+        # was taken from it, not added to it
+        portfolio_value = settings.dry_run_balance_usd
     else:
         try:
             wallet = await adapter.get_wallet_state()
