@@ -238,7 +238,7 @@ def targets_list(ctx):
 )
 @click.option("--history-window", default=50, type=int, help="Trades in conviction history window")
 @click.option("--min-history", default=10, type=int, help="Min trades before conviction activates")
-@click.option("--cold-start-pct", default=50.0, type=float, help="Budget % during cold start")
+@click.option("--cold-start-pct", default=0.0, type=float, help="Budget % during cold start (0=observe only)")
 @click.option("--conviction-floor", default=10.0, type=float, help="Min budget % per trade")
 @click.option("--conviction-ceiling", default=90.0, type=float, help="Max budget % per trade")
 @click.pass_context

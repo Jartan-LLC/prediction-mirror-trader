@@ -17,7 +17,8 @@ from prediction_mirror.store import Store, init_db
 NOW = datetime(2025, 6, 15, 12, 0, 0, tzinfo=timezone.utc)
 
 TARGET = TargetConfig(
-    label="Whale", platform="polymarket", address="0xAAA", allocation_pct=50.0
+    label="Whale", platform="polymarket", address="0xAAA", allocation_pct=50.0,
+    cold_start_pct=50.0,
 )
 
 

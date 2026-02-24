@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS targets (
     sizing_mode     TEXT    NOT NULL DEFAULT 'conviction',
     history_window  INTEGER NOT NULL DEFAULT 50,
     min_history     INTEGER NOT NULL DEFAULT 10,
-    cold_start_pct  REAL    NOT NULL DEFAULT 50.0,
+    cold_start_pct  REAL    NOT NULL DEFAULT 0.0,
     conviction_floor_pct   REAL NOT NULL DEFAULT 10.0,
     conviction_ceiling_pct REAL NOT NULL DEFAULT 90.0,
     created_at      TEXT    NOT NULL,

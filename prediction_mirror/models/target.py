@@ -14,7 +14,7 @@ class TargetConfig:
     sizing_mode: str = "conviction"
     history_window: int = 50
     min_history: int = 10
-    cold_start_pct: float = 50.0
+    cold_start_pct: float = 0.0
     conviction_floor_pct: float = 10.0
     conviction_ceiling_pct: float = 90.0
 
@@ -29,8 +29,8 @@ class TargetConfig:
             raise ValueError(f"sizing_mode must be 'conviction' or 'proportional', got {self.sizing_mode!r}")
         if self.min_history < 10:
             raise ValueError(f"min_history must be >= 10, got {self.min_history}")
-        if not 1 <= self.cold_start_pct <= 100:
-            raise ValueError(f"cold_start_pct must be 1-100, got {self.cold_start_pct}")
+        if not 0 <= self.cold_start_pct <= 100:
+            raise ValueError(f"cold_start_pct must be 0-100, got {self.cold_start_pct}")
         if not 1 <= self.conviction_floor_pct <= 100:
             raise ValueError(f"conviction_floor_pct must be 1-100, got {self.conviction_floor_pct}")
         if not 1 <= self.conviction_ceiling_pct <= 100:

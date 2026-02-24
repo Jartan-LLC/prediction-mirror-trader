@@ -490,6 +490,7 @@ class TestConvictionSizing:
         target = TargetConfig(
             label="Whale", platform="polymarket", address="0xAAA",
             allocation_pct=50.0, sizing_mode="conviction", multiplier=2.0,
+            cold_start_pct=50.0,
         )
         sig = _signal(target=target, delta=100.0, price=0.50)
         result, _ = size_order(
