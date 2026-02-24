@@ -35,13 +35,15 @@ def size_order(
     our_position: OurPosition | None,
     settings: Settings,
     trade_history: list[float] | None = None,
+    target_current_size: float | None = None,
 ) -> tuple[SizedOrder | None, str | None]:
     """Pure calculation. Returns (SizedOrder, None) or (None, reason)."""
     dry_run = settings.dry_run
 
     if signal.signal_type == SignalType.SELL:
         return _size_sell(
-            signal, current_price, our_position, settings, dry_run, trade_history,
+            signal, current_price, our_position, settings, dry_run,
+            trade_history, target_current_size,
         )
 
     target = signal.target
@@ -223,43 +225,33 @@ def _size_sell(
     settings: Settings,
     dry_run: bool,
     trade_history: list[float] | None = None,
+    target_current_size: float | None = None,
 ) -> tuple[SizedOrder | None, str | None]:
     if our_position is None or our_position.size <= 0:
         return None, "no position to sell"
 
-    target = signal.target
-    trade_usd = signal.target_delta * signal.target_price
-    history = trade_history or []
-
-    # Determine what fraction of our position to sell
-    if target.sizing_mode == "conviction" and len(history) >= target.min_history:
-        base = target.trade_size_pct / 100
-        pct_rank = percentile_rank(trade_usd, history)
-        fraction = base * (1 + pct_rank)
-        raw_size = our_position.size * fraction * target.multiplier
-        sizing_detail = (
-            f"P{pct_rank * 100:.0f} conviction "
-            f"→ sell {fraction * 100:.1f}% of position"
-        )
-    elif target.sizing_mode == "conviction":
-        # Cold start for sells
-        fraction = (
-            target.cold_start_pct / 100
-            if target.cold_start_pct > 0
-            else target.trade_size_pct / 100
-        )
-        raw_size = our_position.size * fraction * target.multiplier
-        sizing_detail = (
-            f"cold start ({len(history)}/{target.min_history} trades)"
-        )
-    else:
-        # Proportional mode — use target_prev_size if available
-        if signal.target_prev_size > 0:
-            reduction_pct = signal.target_delta / signal.target_prev_size
-            raw_size = our_position.size * reduction_pct
+    # Calculate reduction percentage from target's current + sold size
+    # prev_size = current_remaining + sold_amount
+    if target_current_size is not None:
+        prev_size = target_current_size + signal.target_delta
+        if prev_size <= 0:
+            reduction_pct = 1.0
         else:
-            raw_size = our_position.size * (target.trade_size_pct / 100)
+            reduction_pct = signal.target_delta / prev_size
+        raw_size = our_position.size * reduction_pct
+        sizing_detail = (
+            f"target reduced {reduction_pct * 100:.0f}% "
+            f"({signal.target_delta:.0f}/{prev_size:.0f})"
+        )
+    elif signal.target_prev_size > 0:
+        # Fallback to target_prev_size if available (legacy/proportional)
+        reduction_pct = signal.target_delta / signal.target_prev_size
+        raw_size = our_position.size * reduction_pct
         sizing_detail = "proportional"
+    else:
+        # No position info available — sell base percentage
+        raw_size = our_position.size * (signal.target.trade_size_pct / 100)
+        sizing_detail = "no target size info, using trade_size_pct"
 
     # Cap at our actual holding
     raw_size = min(raw_size, our_position.size)

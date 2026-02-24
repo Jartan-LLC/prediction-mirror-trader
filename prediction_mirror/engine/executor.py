@@ -91,6 +91,22 @@ async def _process_signal(
         signal.target.label, signal.target.history_window
     )
 
+    # For sells, fetch target's current position to calculate reduction %
+    target_current_size = None
+    if signal.signal_type == SignalType.SELL:
+        try:
+            target_positions = await adapter.fetch_target_positions(
+                signal.target.address
+            )
+            for tp in target_positions:
+                if tp.asset_id == signal.asset_id:
+                    target_current_size = tp.size
+                    break
+            if target_current_size is None:
+                target_current_size = 0.0  # fully exited
+        except Exception as e:
+            logger.warning(f"Failed to fetch target positions for sell sizing: {e}")
+
     # Size the order
     sized, skip_reason = size_order(
         signal=signal,
@@ -101,6 +117,7 @@ async def _process_signal(
         our_position=our_pos,
         settings=settings,
         trade_history=trade_history,
+        target_current_size=target_current_size,
     )
 
     if sized is None:
