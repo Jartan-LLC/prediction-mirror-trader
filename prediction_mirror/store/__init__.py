@@ -129,6 +129,9 @@ class Store:
     def get_total_deployed(self) -> float:
         return portfolio.get_total_deployed(self.conn)
 
+    def get_allocation_summary(self, targets: list, portfolio_value: float) -> dict:
+        return portfolio.get_allocation_summary(self.conn, targets, portfolio_value)
+
     # ── Trade History ──
 
     def record_observed_trade(self, target_label: str, trade_usd: float, detected_at) -> None:

@@ -35,8 +35,9 @@ def cli(ctx, db):
 
 
 @cli.command()
+@click.option("--no-dashboard", is_flag=True, help="Disable live dashboard, use log output")
 @click.pass_context
-def run(ctx):
+def run(ctx, no_dashboard):
     """Start the mirror trading bot."""
     load_dotenv()
     db_path = ctx.obj["db_path"]
@@ -44,18 +45,23 @@ def run(ctx):
     store = Store(conn)
 
     settings = store.get_settings()
-    configure_logging(settings.log_level)
+
+    # Dashboard mode: TTY + not disabled
+    use_dashboard = sys.stdout.isatty() and not no_dashboard
+
+    # In dashboard mode, only log to file (dashboard owns the terminal)
+    configure_logging(settings.log_level, console=not use_dashboard)
 
     from prediction_mirror.dashboard.listener import DashboardListener
     from prediction_mirror.engine.core import Engine
     from prediction_mirror.platforms import get_adapter_class
+    from rich.live import Live
 
     # Build adapters for enabled targets
     adapters = {}
     targets = store.get_enabled_targets()
     for target in targets:
         if target.platform not in adapters:
-            # Import platform module to trigger registration
             try:
                 __import__(f"prediction_mirror.platforms.{target.platform}")
             except ImportError:
@@ -65,27 +71,46 @@ def run(ctx):
                 cls = get_adapter_class(target.platform)
                 adapters[target.platform] = cls.from_env()
             except Exception as e:
-                console.print(f"[red]Failed to create adapter for {target.platform}: {e}[/red]")
+                console.print(
+                    f"[red]Failed to create adapter for {target.platform}: {e}[/red]"
+                )
                 sys.exit(1)
-
-    engine = Engine(store, adapters)
-    dashboard = DashboardListener(store)
-    engine.add_listener(dashboard)
-
-    console.print(f"[bold]Starting Prediction Mirror Trader[/bold]")
-    console.print(f"  DB: {db_path}")
-    console.print(f"  Mode: {'[yellow]DRY RUN[/yellow]' if settings.dry_run else '[red]LIVE[/red]'}")
-    console.print(f"  Targets: {len(targets)} enabled")
 
     async def _run():
         for adapter in adapters.values():
             await adapter.initialize()
 
-        loop = asyncio.get_event_loop()
-        loop.add_signal_handler(signal_mod.SIGINT, lambda: asyncio.create_task(engine.shutdown()))
-        loop.add_signal_handler(signal_mod.SIGTERM, lambda: asyncio.create_task(engine.shutdown()))
+        engine = Engine(store, adapters)
 
-        await engine.run()
+        if use_dashboard:
+            live = Live(console=console, refresh_per_second=1, screen=False)
+            live.start()
+        else:
+            live = None
+
+        dashboard = DashboardListener(store, live=live)
+        engine.add_listener(dashboard)
+
+        loop = asyncio.get_event_loop()
+        loop.add_signal_handler(
+            signal_mod.SIGINT, lambda: asyncio.create_task(engine.shutdown())
+        )
+        loop.add_signal_handler(
+            signal_mod.SIGTERM, lambda: asyncio.create_task(engine.shutdown())
+        )
+
+        try:
+            await engine.run()
+        finally:
+            if live:
+                live.stop()
+
+    if not use_dashboard:
+        console.print("[bold]Starting Prediction Mirror Trader[/bold]")
+        console.print(f"  DB: {db_path}")
+        mode = "[yellow]DRY RUN[/yellow]" if settings.dry_run else "[red]LIVE[/red]"
+        console.print(f"  Mode: {mode}")
+        console.print(f"  Targets: {len(targets)} enabled")
 
     try:
         asyncio.run(_run())
@@ -94,7 +119,8 @@ def run(ctx):
     finally:
         from prediction_mirror.store.database import close
         close()
-        console.print("[dim]Shutdown complete.[/dim]")
+        if not use_dashboard:
+            console.print("[dim]Shutdown complete.[/dim]")
 
 
 # ── Settings commands ──

@@ -116,3 +116,29 @@ def get_total_deployed(conn: sqlite3.Connection) -> float:
         "WHERE dry_run = 0 AND size > 0"
     ).fetchone()
     return row["deployed"]
+
+
+def get_allocation_summary(
+    conn: sqlite3.Connection,
+    targets: list,
+    portfolio_value: float,
+) -> dict[str, dict]:
+    """Build allocation summary for dashboard display."""
+    result = {}
+    total_alloc = 0.0
+    for t in targets:
+        budget = portfolio_value * (t.allocation_pct / 100)
+        deployed = get_deployed_for_target(conn, t.label)
+        result[t.label] = {
+            "allocation_pct": t.allocation_pct,
+            "budget": budget,
+            "deployed": deployed,
+            "available": max(budget - deployed, 0),
+        }
+        total_alloc += t.allocation_pct
+    reserve_pct = 100 - total_alloc
+    if reserve_pct > 0:
+        result["_reserve"] = {
+            "available": portfolio_value * (reserve_pct / 100),
+        }
+    return result

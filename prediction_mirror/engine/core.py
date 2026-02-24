@@ -44,6 +44,7 @@ class Engine:
         self._tasks = [
             asyncio.create_task(self._monitor_loop()),
             asyncio.create_task(self._redeemer_loop()),
+            asyncio.create_task(self._dashboard_loop()),
         ]
 
         try:
@@ -106,3 +107,15 @@ class Engine:
                 logger.exception("Error in redeemer pass")
 
             await asyncio.sleep(settings.redeemer_interval_seconds)
+
+    async def _dashboard_loop(self) -> None:
+        while self._running:
+            settings = self._store.get_settings()
+            for listener in self._listeners:
+                render = getattr(listener, "render", None)
+                if render:
+                    try:
+                        render()
+                    except Exception:
+                        logger.exception("Dashboard render error")
+            await asyncio.sleep(settings.dashboard_refresh_seconds)

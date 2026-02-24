@@ -9,7 +9,7 @@ MAX_BYTES = 10 * 1024 * 1024  # 10 MB
 BACKUP_COUNT = 3
 
 
-def configure_logging(level: str = "INFO") -> None:
+def configure_logging(level: str = "INFO", console: bool = True) -> None:
     root = logging.getLogger("prediction_mirror")
     root.setLevel(getattr(logging, level.upper(), logging.INFO))
 
@@ -17,9 +17,10 @@ def configure_logging(level: str = "INFO") -> None:
     if root.handlers:
         return
 
-    console = logging.StreamHandler()
-    console.setFormatter(logging.Formatter(LOG_FORMAT))
-    root.addHandler(console)
+    if console:
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(logging.Formatter(LOG_FORMAT))
+        root.addHandler(console_handler)
 
     file_handler = RotatingFileHandler(LOG_FILE, maxBytes=MAX_BYTES, backupCount=BACKUP_COUNT)
     file_handler.setLevel(logging.DEBUG)
