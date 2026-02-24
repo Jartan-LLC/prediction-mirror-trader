@@ -131,11 +131,11 @@ async def _process_signal(
             f"Skipped {signal.signal_type.value} {signal.target.label} "
             f"{signal.outcome}@{signal.market_id[:12]}.. — {skip_reason}"
         )
-        if retriable and track_goals:
-            delta = signal.target_delta if signal.signal_type == SignalType.BUY else -signal.target_delta
+        if retriable and track_goals and signal.signal_type == SignalType.SELL:
             store.upsert_goal(
                 signal.target.label, signal.market_id, signal.asset_id,
-                signal.outcome, signal.platform, delta, signal.target_price,
+                signal.outcome, signal.platform, -signal.target_delta,
+                signal.target_price,
             )
         return None
 
@@ -151,20 +151,19 @@ async def _process_signal(
         store.reduce_goal(
             signal.target.label, signal.market_id, signal.asset_id, filled,
         )
-        # Check for partial fill — unfilled remainder becomes a goal
-        if track_goals and filled < sized.size:
+        # Check for partial fill — unfilled sell remainder becomes a goal
+        if (track_goals and sized.side == OrderSide.SELL
+                and filled < sized.size):
             remainder = sized.size - filled
-            delta = remainder if sized.side == OrderSide.BUY else -remainder
             store.upsert_goal(
                 signal.target.label, signal.market_id, signal.asset_id,
-                signal.outcome, signal.platform, delta, current_price,
+                signal.outcome, signal.platform, -remainder, current_price,
             )
-    elif track_goals:
-        # Execution failed — create goal for the full order
-        delta = sized.size if sized.side == OrderSide.BUY else -sized.size
+    elif track_goals and sized.side == OrderSide.SELL:
+        # Sell execution failed — create goal
         store.upsert_goal(
             signal.target.label, signal.market_id, signal.asset_id,
-            signal.outcome, signal.platform, delta, current_price,
+            signal.outcome, signal.platform, -sized.size, current_price,
         )
 
     # Persist atomically
