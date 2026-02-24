@@ -27,9 +27,9 @@ NOW = datetime(2025, 6, 15, 12, 0, 0, tzinfo=timezone.utc)
 @pytest.fixture
 def mock_pmxt():
     client = MagicMock()
-    client.get_market = MagicMock()
-    client.get_order_book = MagicMock()
-    client.create_and_post_order = MagicMock()
+    client.fetch_market = MagicMock()
+    client.fetch_order_book = MagicMock()
+    client.create_order = MagicMock()
     client.cancel_order = MagicMock()
     return client
 
@@ -203,7 +203,7 @@ class TestAdapterInit:
 class TestAdapterMarkets:
     @pytest.mark.asyncio
     async def test_fetch_market(self, adapter, mock_pmxt):
-        mock_pmxt.get_market.return_value = SimpleNamespace(
+        mock_pmxt.fetch_market.return_value = SimpleNamespace(
             question="Will BTC hit 100k?",
             outcomes=[SimpleNamespace(label="Yes"), SimpleNamespace(label="No")],
             resolved=False,
@@ -217,7 +217,7 @@ class TestAdapterMarkets:
 
     @pytest.mark.asyncio
     async def test_fetch_market_resolved(self, adapter, mock_pmxt):
-        mock_pmxt.get_market.return_value = SimpleNamespace(
+        mock_pmxt.fetch_market.return_value = SimpleNamespace(
             question="Resolved?",
             outcomes=[],
             resolved=True,
@@ -230,7 +230,7 @@ class TestAdapterMarkets:
 
     @pytest.mark.asyncio
     async def test_get_price_buy(self, adapter, mock_pmxt):
-        mock_pmxt.get_order_book.return_value = SimpleNamespace(
+        mock_pmxt.fetch_order_book.return_value = SimpleNamespace(
             bids=[SimpleNamespace(price=0.54)],
             asks=[SimpleNamespace(price=0.56)],
         )
@@ -240,7 +240,7 @@ class TestAdapterMarkets:
 
     @pytest.mark.asyncio
     async def test_get_price_sell(self, adapter, mock_pmxt):
-        mock_pmxt.get_order_book.return_value = SimpleNamespace(
+        mock_pmxt.fetch_order_book.return_value = SimpleNamespace(
             bids=[SimpleNamespace(price=0.54)],
             asks=[SimpleNamespace(price=0.56)],
         )
@@ -250,14 +250,14 @@ class TestAdapterMarkets:
 
     @pytest.mark.asyncio
     async def test_get_price_midpoint_fallback(self, adapter, mock_pmxt):
-        mock_pmxt.get_order_book.return_value = SimpleNamespace(
+        mock_pmxt.fetch_order_book.return_value = SimpleNamespace(
             bids=[SimpleNamespace(price=0.50)],
             asks=[SimpleNamespace(price=0.60)],
         )
         await adapter.initialize()
         # Side is "buy" but no asks — only bids have data.
         # Actually both have data, so let's test empty asks for buy:
-        mock_pmxt.get_order_book.return_value = SimpleNamespace(
+        mock_pmxt.fetch_order_book.return_value = SimpleNamespace(
             bids=[SimpleNamespace(price=0.50)],
             asks=[],
         )
@@ -269,7 +269,7 @@ class TestAdapterMarkets:
 class TestAdapterTrading:
     @pytest.mark.asyncio
     async def test_submit_order_success(self, adapter, mock_pmxt, signal):
-        mock_pmxt.create_and_post_order.return_value = SimpleNamespace(order_id="ord_123")
+        mock_pmxt.create_order.return_value = SimpleNamespace(id="ord_123")
         await adapter.initialize()
 
         order = SizedOrder(
@@ -287,7 +287,7 @@ class TestAdapterTrading:
 
     @pytest.mark.asyncio
     async def test_submit_order_fatal_error(self, adapter, mock_pmxt, signal):
-        mock_pmxt.create_and_post_order.side_effect = Exception("insufficient funds")
+        mock_pmxt.create_order.side_effect = Exception("insufficient funds")
         await adapter.initialize()
 
         order = SizedOrder(
@@ -304,7 +304,7 @@ class TestAdapterTrading:
 
     @pytest.mark.asyncio
     async def test_submit_order_transient_error(self, adapter, mock_pmxt, signal):
-        mock_pmxt.create_and_post_order.side_effect = Exception("timeout connecting")
+        mock_pmxt.create_order.side_effect = Exception("timeout connecting")
         await adapter.initialize()
 
         order = SizedOrder(

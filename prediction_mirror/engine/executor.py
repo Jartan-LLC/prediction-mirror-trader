@@ -75,7 +75,7 @@ async def _process_signal(
         side = "buy" if signal.signal_type == SignalType.BUY else "sell"
         current_price = await adapter.get_price(signal.asset_id, side)
     except Exception as e:
-        logger.warning(f"Failed to get price: {e}")
+        logger.warning(f"Failed to get price for {signal.asset_id}: {e}")
         return None
 
     # Size the order

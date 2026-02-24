@@ -95,7 +95,7 @@ class PolymarketAdapter(PlatformAdapter):
     async def fetch_market(self, market_id: str) -> Market:
         try:
             result = await asyncio.to_thread(
-                self._pmxt.get_market, market_id
+                self._pmxt.fetch_market, market_id
             )
             status = MarketStatus.OPEN
             if getattr(result, "resolved", False):
@@ -121,7 +121,7 @@ class PolymarketAdapter(PlatformAdapter):
     async def get_price(self, asset_id: str, side: str) -> float:
         try:
             book = await asyncio.to_thread(
-                self._pmxt.get_order_book, asset_id
+                self._pmxt.fetch_order_book, asset_id
             )
             if side == "buy":
                 asks = getattr(book, "asks", [])
@@ -159,16 +159,17 @@ class PolymarketAdapter(PlatformAdapter):
         now = datetime.now(timezone.utc)
         try:
             result = await asyncio.to_thread(
-                self._pmxt.create_and_post_order,
-                token_id=order.asset_id,
+                self._pmxt.create_order,
+                outcome_id=order.asset_id,
+                side="buy" if order.side.value == "BUY" else "sell",
+                type="limit",
+                amount=order.size,
                 price=order.price,
-                size=order.size,
-                side="BUY" if order.side.value == "BUY" else "SELL",
             )
             return OrderResult(
                 order=order,
                 success=True,
-                order_id=getattr(result, "order_id", str(result)),
+                order_id=getattr(result, "id", str(result)),
                 fill_price=order.price,
                 fill_size=order.size,
                 error=None,
