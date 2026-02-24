@@ -24,11 +24,14 @@ async def handle_signals(
     store,
     settings: Settings,
     dispatch=None,
+    track_goals: bool = True,
 ) -> list[OrderResult]:
     """Process signals: size, execute (or paper-trade), persist."""
     results = []
     for signal in signals:
-        result = await _process_signal(signal, adapter, store, settings, dispatch)
+        result = await _process_signal(
+            signal, adapter, store, settings, dispatch, track_goals,
+        )
         if result is not None:
             results.append(result)
     return results
@@ -40,6 +43,7 @@ async def _process_signal(
     store,
     settings: Settings,
     dispatch=None,
+    track_goals: bool = True,
 ) -> OrderResult | None:
     """Process a single signal end-to-end."""
     # Persist signal to audit log
@@ -125,7 +129,7 @@ async def _process_signal(
             f"Skipped {signal.signal_type.value} {signal.target.label} "
             f"{signal.outcome}@{signal.market_id[:12]}.. — {skip_reason}"
         )
-        if retriable:
+        if retriable and track_goals:
             delta = signal.target_delta if signal.signal_type == SignalType.BUY else -signal.target_delta
             store.upsert_goal(
                 signal.target.label, signal.market_id, signal.asset_id,
@@ -146,14 +150,14 @@ async def _process_signal(
             signal.target.label, signal.market_id, signal.asset_id, filled,
         )
         # Check for partial fill — unfilled remainder becomes a goal
-        if filled < sized.size:
+        if track_goals and filled < sized.size:
             remainder = sized.size - filled
             delta = remainder if sized.side == OrderSide.BUY else -remainder
             store.upsert_goal(
                 signal.target.label, signal.market_id, signal.asset_id,
                 signal.outcome, signal.platform, delta, current_price,
             )
-    else:
+    elif track_goals:
         # Execution failed — create goal for the full order
         delta = sized.size if sized.side == OrderSide.BUY else -sized.size
         store.upsert_goal(

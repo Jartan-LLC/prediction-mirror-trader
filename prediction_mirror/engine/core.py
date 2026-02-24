@@ -164,6 +164,7 @@ class Engine:
                         results = await executor.handle_signals(
                             [synthetic], adapter, self._store, settings,
                             dispatch=self._dispatch,
+                            track_goals=False,
                         )
                     except Exception as e:
                         logger.warning(
