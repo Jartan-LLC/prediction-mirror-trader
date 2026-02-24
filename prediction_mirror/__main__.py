@@ -166,18 +166,32 @@ def targets_list(ctx):
     table.add_column("Platform")
     table.add_column("Address", max_width=20)
     table.add_column("Alloc %", justify="right")
-    table.add_column("Multiplier", justify="right")
+    table.add_column("Mult", justify="right")
+    table.add_column("Sizing")
+    table.add_column("History", justify="right")
+    table.add_column("Floor/Ceil", justify="right")
     table.add_column("Enabled", justify="center")
 
     from prediction_mirror.utils.formatting import fmt_address
 
     for t in all_targets:
+        if t.sizing_mode == "conviction":
+            sizing = f"conviction (cold {t.cold_start_pct:.0f}%)"
+            history = f"{t.min_history}/{t.history_window}"
+            floor_ceil = f"{t.conviction_floor_pct:.0f}-{t.conviction_ceiling_pct:.0f}%"
+        else:
+            sizing = "proportional"
+            history = "-"
+            floor_ceil = "-"
         table.add_row(
             t.label,
             t.platform,
             fmt_address(t.address),
             f"{t.allocation_pct:.1f}",
             f"{t.multiplier:.1f}",
+            sizing,
+            history,
+            floor_ceil,
             "[green]Yes[/green]" if t.enabled else "[red]No[/red]",
         )
 
