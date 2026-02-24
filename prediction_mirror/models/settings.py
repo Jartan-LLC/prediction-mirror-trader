@@ -15,6 +15,7 @@ class Settings:
     dashboard_refresh_seconds: int = 30
     dry_run: bool = True
     dry_run_balance_usd: float = 1000.0
+    dry_run_cash: float = -1.0  # -1 means "not initialized, use dry_run_balance_usd"
     log_level: str = "INFO"
 
     def __post_init__(self):

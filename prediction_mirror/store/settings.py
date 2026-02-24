@@ -15,6 +15,7 @@ DEFAULTS: dict[str, str] = {
     "dashboard_refresh_seconds": "30",
     "dry_run": "true",
     "dry_run_balance_usd": "1000.0",
+    "dry_run_cash": "-1",
     "log_level": "INFO",
 }
 
@@ -32,6 +33,7 @@ _FIELD_TYPES: dict[str, type] = {
     "dashboard_refresh_seconds": int,
     "dry_run": bool,
     "dry_run_balance_usd": float,
+    "dry_run_cash": float,
     "log_level": str,
 }
 

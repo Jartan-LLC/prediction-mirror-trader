@@ -70,9 +70,10 @@ async def _process_signal(
 
     # Calculate portfolio value
     if settings.dry_run:
-        # dry_run_balance_usd IS the total portfolio — deployed capital
-        # was taken from it, not added to it
-        portfolio_value = settings.dry_run_balance_usd
+        cash = settings.dry_run_cash
+        if cash < 0:
+            cash = settings.dry_run_balance_usd
+        portfolio_value = cash + store.get_total_deployed(dry_run=True)
     else:
         try:
             wallet = await adapter.get_wallet_state()
@@ -186,16 +187,29 @@ async def _execute_with_retry(
 
 
 def _persist_result(store, result: OrderResult, signal_id: int, old_position: OurPosition | None):
-    """Atomically persist trade + update position."""
+    """Atomically persist trade + update position + update dry-run cash."""
     order = result.order
     now = datetime.now(timezone.utc)
 
     with store.conn:
-        from prediction_mirror.store import trades, portfolio
+        from prediction_mirror.store import trades, portfolio, settings
 
         trades.insert_trade(store.conn, result, signal_id)
 
         if result.success and result.fill_size and result.fill_price:
+            # Update dry-run cash balance
+            if order.dry_run:
+                trade_usd = result.fill_size * result.fill_price
+                current = settings.get_current(store.conn)
+                cash = current.dry_run_cash
+                if cash < 0:
+                    cash = current.dry_run_balance_usd
+                if order.side == OrderSide.BUY:
+                    cash -= trade_usd
+                elif order.side == OrderSide.SELL:
+                    cash += trade_usd
+                settings.set_value(store.conn, "dry_run_cash", str(cash))
+
             if order.side == OrderSide.BUY:
                 old_size = old_position.size if old_position else 0.0
                 old_cost = old_position.total_cost if old_position else 0.0
