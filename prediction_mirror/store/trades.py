@@ -20,7 +20,7 @@ def insert_trade(conn: sqlite3.Connection, result: OrderResult, signal_id: int) 
             order.signal.target.label,
             order.signal.platform,
             order.side.value,
-            order.asset_id,
+            order.signal.market_id,
             order.asset_id,
             order.price,
             order.size,
