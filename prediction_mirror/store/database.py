@@ -18,9 +18,23 @@ CREATE TABLE IF NOT EXISTS targets (
     allocation_pct  REAL    NOT NULL,
     multiplier      REAL    NOT NULL DEFAULT 1.0,
     enabled         INTEGER NOT NULL DEFAULT 1,
+    sizing_mode     TEXT    NOT NULL DEFAULT 'conviction',
+    history_window  INTEGER NOT NULL DEFAULT 50,
+    min_history     INTEGER NOT NULL DEFAULT 10,
+    cold_start_pct  REAL    NOT NULL DEFAULT 50.0,
+    conviction_floor_pct   REAL NOT NULL DEFAULT 10.0,
+    conviction_ceiling_pct REAL NOT NULL DEFAULT 90.0,
     created_at      TEXT    NOT NULL,
     UNIQUE(platform, address)
 );
+
+CREATE TABLE IF NOT EXISTS target_trade_history (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    target_label    TEXT    NOT NULL,
+    trade_usd       REAL    NOT NULL,
+    detected_at     TEXT    NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_trade_history_target ON target_trade_history(target_label);
 
 CREATE TABLE IF NOT EXISTS target_snapshots (
     target_address  TEXT    NOT NULL,

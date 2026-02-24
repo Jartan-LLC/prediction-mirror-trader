@@ -13,7 +13,8 @@ from prediction_mirror.models.target import TargetConfig
 NOW = datetime(2025, 6, 15, 12, 0, 0, tzinfo=timezone.utc)
 
 TARGET = TargetConfig(
-    label="Whale", platform="polymarket", address="0xAAA", allocation_pct=50.0
+    label="Whale", platform="polymarket", address="0xAAA", allocation_pct=50.0,
+    sizing_mode="proportional",
 )
 
 
@@ -165,7 +166,7 @@ class TestSizeOrderBuy:
 
         target = TargetConfig(
             label="Whale", platform="polymarket", address="0xAAA",
-            allocation_pct=50.0, multiplier=2.0,
+            allocation_pct=50.0, multiplier=2.0, sizing_mode="proportional",
         )
         sig = _signal(target=target, delta=10.0, price=0.55)
         result, _ = size_order(
@@ -328,3 +329,175 @@ class TestCheckSlippage:
         from prediction_mirror.engine.strategy import check_slippage
 
         assert check_slippage(1.00, 1.03, 2.0) is False
+
+
+# ── Percentile Rank ──
+
+
+class TestPercentileRank:
+    def test_lowest_value(self):
+        from prediction_mirror.engine.strategy import percentile_rank
+
+        assert percentile_rank(1.0, [1.0, 2.0, 3.0, 4.0, 5.0]) == pytest.approx(0.2)
+
+    def test_highest_value(self):
+        from prediction_mirror.engine.strategy import percentile_rank
+
+        assert percentile_rank(5.0, [1.0, 2.0, 3.0, 4.0, 5.0]) == pytest.approx(1.0)
+
+    def test_median_value(self):
+        from prediction_mirror.engine.strategy import percentile_rank
+
+        assert percentile_rank(3.0, [1.0, 2.0, 3.0, 4.0, 5.0]) == pytest.approx(0.6)
+
+    def test_above_all(self):
+        from prediction_mirror.engine.strategy import percentile_rank
+
+        assert percentile_rank(10.0, [1.0, 2.0, 3.0]) == pytest.approx(1.0)
+
+    def test_below_all(self):
+        from prediction_mirror.engine.strategy import percentile_rank
+
+        assert percentile_rank(0.5, [1.0, 2.0, 3.0]) == pytest.approx(0.0)
+
+
+# ── Conviction Sizing ──
+
+
+CONVICTION_TARGET = TargetConfig(
+    label="Whale", platform="polymarket", address="0xAAA",
+    allocation_pct=50.0, sizing_mode="conviction",
+    min_history=10, cold_start_pct=50.0,
+    conviction_floor_pct=10.0, conviction_ceiling_pct=90.0,
+)
+
+
+class TestConvictionSizing:
+    def test_cold_start_uses_fixed_fraction(self):
+        from prediction_mirror.engine.strategy import size_order
+
+        sig = _signal(target=CONVICTION_TARGET, delta=100.0, price=0.50)
+        # Only 5 trades in history — below min_history of 10
+        history = [10.0, 20.0, 30.0, 40.0, 50.0]
+        result, reason = size_order(
+            signal=sig, current_price=0.50, portfolio_value=1000.0,
+            target_portfolio_value=0, deployed_for_target=0.0,
+            our_position=None, settings=Settings(min_order_usd=0.01),
+            trade_history=history,
+        )
+        assert result is not None
+        assert reason is None
+        # budget = 500, cold_start = 50% → $250
+        assert result.usd_amount == pytest.approx(250.0)
+
+    def test_conviction_low_percentile(self):
+        from prediction_mirror.engine.strategy import size_order
+
+        sig = _signal(target=CONVICTION_TARGET, delta=10.0, price=0.50)
+        # 10 trades: this trade (10*0.50=$5) is very small
+        history = [5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 300.0, 400.0, 500.0, 1000.0]
+        result, _ = size_order(
+            signal=sig, current_price=0.50, portfolio_value=1000.0,
+            target_portfolio_value=0, deployed_for_target=0.0,
+            our_position=None, settings=Settings(min_order_usd=0.01),
+            trade_history=history,
+        )
+        assert result is not None
+        # trade_usd = 10*0.50 = $5, 1/10 values <= 5 → P10
+        # fraction = 0.1 + 0.1*(0.9-0.1) = 0.18 → usd = 500 * 0.18 = $90
+        assert result.usd_amount == pytest.approx(90.0)
+
+    def test_conviction_high_percentile(self):
+        from prediction_mirror.engine.strategy import size_order
+
+        sig = _signal(target=CONVICTION_TARGET, delta=2000.0, price=0.50)
+        # trade_usd = 2000*0.50 = $1000, above everything in history
+        history = [5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 300.0, 400.0, 500.0, 800.0]
+        result, _ = size_order(
+            signal=sig, current_price=0.50, portfolio_value=1000.0,
+            target_portfolio_value=0, deployed_for_target=0.0,
+            our_position=None, settings=Settings(min_order_usd=0.01),
+            trade_history=history,
+        )
+        assert result is not None
+        # P100 → fraction = 0.1 + 1.0*(0.9-0.1) = 0.9 → usd = 500*0.9 = $450
+        assert result.usd_amount == pytest.approx(450.0)
+
+    def test_conviction_respects_floor(self):
+        from prediction_mirror.engine.strategy import size_order
+
+        sig = _signal(target=CONVICTION_TARGET, delta=1.0, price=0.50)
+        # trade_usd=$0.50, below everything
+        history = [10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 90.0, 100.0]
+        result, _ = size_order(
+            signal=sig, current_price=0.50, portfolio_value=1000.0,
+            target_portfolio_value=0, deployed_for_target=0.0,
+            our_position=None, settings=Settings(min_order_usd=0.01),
+            trade_history=history,
+        )
+        assert result is not None
+        # P0 → fraction = floor = 0.10 → usd = 500*0.10 = $50
+        assert result.usd_amount == pytest.approx(50.0)
+
+    def test_conviction_respects_ceiling(self):
+        from prediction_mirror.engine.strategy import size_order
+
+        sig = _signal(target=CONVICTION_TARGET, delta=10000.0, price=0.50)
+        history = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]
+        result, _ = size_order(
+            signal=sig, current_price=0.50, portfolio_value=1000.0,
+            target_portfolio_value=0, deployed_for_target=0.0,
+            our_position=None, settings=Settings(min_order_usd=0.01, max_order_usd=10000.0),
+            trade_history=history,
+        )
+        assert result is not None
+        # P100 → fraction = ceiling = 0.90 → usd = 500*0.90 = $450
+        assert result.usd_amount == pytest.approx(450.0)
+
+    def test_conviction_empty_history_uses_cold_start(self):
+        from prediction_mirror.engine.strategy import size_order
+
+        sig = _signal(target=CONVICTION_TARGET, delta=100.0, price=0.50)
+        result, _ = size_order(
+            signal=sig, current_price=0.50, portfolio_value=1000.0,
+            target_portfolio_value=0, deployed_for_target=0.0,
+            our_position=None, settings=Settings(min_order_usd=0.01),
+            trade_history=[],
+        )
+        assert result is not None
+        assert result.usd_amount == pytest.approx(250.0)
+
+    def test_proportional_mode_still_works(self):
+        from prediction_mirror.engine.strategy import size_order
+
+        prop_target = TargetConfig(
+            label="Whale", platform="polymarket", address="0xAAA",
+            allocation_pct=50.0, sizing_mode="proportional",
+        )
+        sig = _signal(target=prop_target, delta=100.0, price=0.55)
+        result, _ = size_order(
+            signal=sig, current_price=0.55, portfolio_value=1000.0,
+            target_portfolio_value=5000.0, deployed_for_target=0.0,
+            our_position=None, settings=Settings(min_order_usd=0.01),
+        )
+        assert result is not None
+        # ratio = 500/5000 = 0.1, raw = 100*0.1 = 10, usd = 5.50
+        assert result.usd_amount == pytest.approx(5.50)
+
+    def test_multiplier_applied_in_conviction(self):
+        from prediction_mirror.engine.strategy import size_order
+
+        target = TargetConfig(
+            label="Whale", platform="polymarket", address="0xAAA",
+            allocation_pct=50.0, sizing_mode="conviction", multiplier=2.0,
+        )
+        sig = _signal(target=target, delta=100.0, price=0.50)
+        result, _ = size_order(
+            signal=sig, current_price=0.50, portfolio_value=1000.0,
+            target_portfolio_value=0, deployed_for_target=0.0,
+            our_position=None, settings=Settings(min_order_usd=0.01, max_order_usd=10000.0),
+            trade_history=[],
+        )
+        assert result is not None
+        # cold start 50% of $500 = $250, * 2.0 multiplier = $500
+        assert result.usd_amount == pytest.approx(500.0)

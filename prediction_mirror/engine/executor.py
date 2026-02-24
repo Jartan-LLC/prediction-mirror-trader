@@ -48,19 +48,26 @@ async def _process_signal(
     if dispatch:
         dispatch("on_signal", signal)
 
+    # Record observed trade value for conviction sizing history.
+    # Done for ALL signals (even ones we'll skip) to build the distribution.
+    trade_usd = signal.target_delta * signal.target_price
+    if trade_usd > 0:
+        store.record_observed_trade(signal.target.label, trade_usd, signal.detected_at)
+
     # Gather context for sizing
-    try:
-        target_pv = await adapter.fetch_target_portfolio_value(signal.target.address)
-    except Exception as e:
-        logger.warning(f"Failed to get target portfolio value: {e}")
-        return None
+    target_pv = 0.0
+    if signal.target.sizing_mode == "proportional":
+        try:
+            target_pv = await adapter.fetch_target_portfolio_value(signal.target.address)
+        except Exception as e:
+            logger.warning(f"Failed to get target portfolio value: {e}")
+            return None
 
     deployed = store.get_deployed_for_target(signal.target.label)
     our_pos = store.get_position(signal.market_id, signal.asset_id, signal.target.label)
 
     # Calculate portfolio value
     if settings.dry_run:
-        # Use simulated balance so paper trading works without real funds
         portfolio_value = settings.dry_run_balance_usd + store.get_total_deployed()
     else:
         try:
@@ -78,6 +85,11 @@ async def _process_signal(
         logger.warning(f"Failed to get price for {signal.asset_id}: {e}")
         return None
 
+    # Get trade history for conviction sizing
+    trade_history = store.get_trade_history(
+        signal.target.label, signal.target.history_window
+    )
+
     # Size the order
     sized, skip_reason = size_order(
         signal=signal,
@@ -87,6 +99,7 @@ async def _process_signal(
         deployed_for_target=deployed,
         our_position=our_pos,
         settings=settings,
+        trade_history=trade_history,
     )
 
     if sized is None:

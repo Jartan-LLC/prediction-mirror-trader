@@ -192,8 +192,21 @@ def targets_list(ctx):
 @click.option("--allocation", required=True, type=float, help="Budget allocation %")
 @click.option("--multiplier", default=1.0, type=float, help="Sizing multiplier")
 @click.option("--enabled/--disabled", default=True)
+@click.option(
+    "--sizing-mode", default="conviction", type=click.Choice(["conviction", "proportional"]),
+    help="Sizing strategy (default: conviction)",
+)
+@click.option("--history-window", default=50, type=int, help="Trades in conviction history window")
+@click.option("--min-history", default=10, type=int, help="Min trades before conviction activates")
+@click.option("--cold-start-pct", default=50.0, type=float, help="Budget % during cold start")
+@click.option("--conviction-floor", default=10.0, type=float, help="Min budget % per trade")
+@click.option("--conviction-ceiling", default=90.0, type=float, help="Max budget % per trade")
 @click.pass_context
-def targets_add(ctx, label, address, platform, allocation, multiplier, enabled):
+def targets_add(
+    ctx, label, address, platform, allocation, multiplier, enabled,
+    sizing_mode, history_window, min_history, cold_start_pct,
+    conviction_floor, conviction_ceiling,
+):
     """Add a new target."""
     from prediction_mirror.models.target import TargetConfig
 
@@ -203,6 +216,10 @@ def targets_add(ctx, label, address, platform, allocation, multiplier, enabled):
         target = TargetConfig(
             label=label, platform=platform, address=address,
             allocation_pct=allocation, multiplier=multiplier, enabled=enabled,
+            sizing_mode=sizing_mode, history_window=history_window,
+            min_history=min_history, cold_start_pct=cold_start_pct,
+            conviction_floor_pct=conviction_floor,
+            conviction_ceiling_pct=conviction_ceiling,
         )
         store.add_target(target)
         console.print(f"[green]Added target: {label}[/green]")

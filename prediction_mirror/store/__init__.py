@@ -12,6 +12,7 @@ from prediction_mirror.store import (
     signals,
     snapshots,
     targets,
+    trade_history,
     trades,
 )
 from prediction_mirror.store.database import close, init_db
@@ -127,6 +128,14 @@ class Store:
 
     def get_total_deployed(self) -> float:
         return portfolio.get_total_deployed(self.conn)
+
+    # ── Trade History ──
+
+    def record_observed_trade(self, target_label: str, trade_usd: float, detected_at) -> None:
+        trade_history.record_trade(self.conn, target_label, trade_usd, detected_at)
+
+    def get_trade_history(self, target_label: str, limit: int = 50) -> list[float]:
+        return trade_history.get_recent_trades(self.conn, target_label, limit)
 
 
 __all__ = ["Store", "init_db", "close"]
