@@ -123,14 +123,18 @@ class Store:
     ) -> None:
         portfolio.zero_out_position(self.conn, market_id, asset_id, source_target)
 
-    def get_deployed_for_target(self, target_label: str) -> float:
-        return portfolio.get_deployed_for_target(self.conn, target_label)
+    def get_deployed_for_target(self, target_label: str, dry_run: bool | None = None) -> float:
+        return portfolio.get_deployed_for_target(self.conn, target_label, dry_run)
 
-    def get_total_deployed(self) -> float:
-        return portfolio.get_total_deployed(self.conn)
+    def get_total_deployed(self, dry_run: bool | None = None) -> float:
+        return portfolio.get_total_deployed(self.conn, dry_run)
 
-    def get_allocation_summary(self, targets: list, portfolio_value: float) -> dict:
-        return portfolio.get_allocation_summary(self.conn, targets, portfolio_value)
+    def get_allocation_summary(
+        self, targets: list, portfolio_value: float, dry_run: bool | None = None
+    ) -> dict:
+        return portfolio.get_allocation_summary(
+            self.conn, targets, portfolio_value, dry_run=dry_run
+        )
 
     # ── Trade History ──
 

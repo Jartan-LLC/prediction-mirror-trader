@@ -101,20 +101,36 @@ def zero_out_position(
     conn.commit()
 
 
-def get_deployed_for_target(conn: sqlite3.Connection, target_label: str) -> float:
-    row = conn.execute(
-        "SELECT COALESCE(SUM(total_cost), 0) as deployed FROM our_positions "
-        "WHERE source_target = ? AND dry_run = 0 AND size > 0",
-        (target_label,),
-    ).fetchone()
+def get_deployed_for_target(
+    conn: sqlite3.Connection, target_label: str, dry_run: bool | None = None
+) -> float:
+    if dry_run is not None:
+        row = conn.execute(
+            "SELECT COALESCE(SUM(total_cost), 0) as deployed FROM our_positions "
+            "WHERE source_target = ? AND dry_run = ? AND size > 0",
+            (target_label, int(dry_run)),
+        ).fetchone()
+    else:
+        row = conn.execute(
+            "SELECT COALESCE(SUM(total_cost), 0) as deployed FROM our_positions "
+            "WHERE source_target = ? AND size > 0",
+            (target_label,),
+        ).fetchone()
     return row["deployed"]
 
 
-def get_total_deployed(conn: sqlite3.Connection) -> float:
-    row = conn.execute(
-        "SELECT COALESCE(SUM(total_cost), 0) as deployed FROM our_positions "
-        "WHERE dry_run = 0 AND size > 0"
-    ).fetchone()
+def get_total_deployed(conn: sqlite3.Connection, dry_run: bool | None = None) -> float:
+    if dry_run is not None:
+        row = conn.execute(
+            "SELECT COALESCE(SUM(total_cost), 0) as deployed FROM our_positions "
+            "WHERE dry_run = ? AND size > 0",
+            (int(dry_run),),
+        ).fetchone()
+    else:
+        row = conn.execute(
+            "SELECT COALESCE(SUM(total_cost), 0) as deployed FROM our_positions "
+            "WHERE size > 0"
+        ).fetchone()
     return row["deployed"]
 
 
@@ -122,13 +138,14 @@ def get_allocation_summary(
     conn: sqlite3.Connection,
     targets: list,
     portfolio_value: float,
+    dry_run: bool | None = None,
 ) -> dict[str, dict]:
     """Build allocation summary for dashboard display."""
     result = {}
     total_alloc = 0.0
     for t in targets:
         budget = portfolio_value * (t.allocation_pct / 100)
-        deployed = get_deployed_for_target(conn, t.label)
+        deployed = get_deployed_for_target(conn, t.label, dry_run=dry_run)
         result[t.label] = {
             "allocation_pct": t.allocation_pct,
             "budget": budget,

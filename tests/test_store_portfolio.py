@@ -102,10 +102,12 @@ class TestDeployed:
         deployed = store.get_deployed_for_target("Whale")
         assert deployed == pytest.approx(10.0 * 0.52)
 
-    def test_deployed_excludes_dry_run(self, store: Store):
+    def test_deployed_filters_by_dry_run(self, store: Store):
         store.upsert_position(_make_position(source_target="Whale", size=10.0, dry_run=True))
-        deployed = store.get_deployed_for_target("Whale")
-        assert deployed == 0.0
+        assert store.get_deployed_for_target("Whale", dry_run=False) == 0.0
+        assert store.get_deployed_for_target("Whale", dry_run=True) == pytest.approx(10.0 * 0.52)
+        # No filter returns all
+        assert store.get_deployed_for_target("Whale") == pytest.approx(10.0 * 0.52)
 
     def test_deployed_excludes_zero_size(self, store: Store):
         store.upsert_position(_make_position(source_target="Whale", size=0.0, dry_run=False))

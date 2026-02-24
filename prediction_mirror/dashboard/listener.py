@@ -56,8 +56,16 @@ class DashboardListener:
         recent_signals = self._store.get_signal_history(limit=10)
         recent_trades = self._store.get_recent_trades(limit=10)
 
-        portfolio_value = settings.dry_run_balance_usd + self._store.get_total_deployed()
-        allocation = self._store.get_allocation_summary(targets, portfolio_value)
+        if settings.dry_run:
+            portfolio_value = (
+                settings.dry_run_balance_usd
+                + self._store.get_total_deployed(dry_run=True)
+            )
+        else:
+            portfolio_value = self._store.get_total_deployed(dry_run=False)
+        allocation = self._store.get_allocation_summary(
+            targets, portfolio_value, dry_run=settings.dry_run,
+        )
 
         panel = render_dashboard(
             uptime=self.uptime,
