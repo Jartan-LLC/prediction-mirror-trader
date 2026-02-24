@@ -42,19 +42,48 @@ class DashboardListener:
         return list(self._errors)
 
     def on_signal(self, signal: Signal) -> None:
-        pass  # Signals retrieved from store for rendering
+        logger.info(
+            f"Signal {signal.signal_type.value} {signal.target.label} "
+            f"{signal.outcome}@{signal.market_id[:12]}.. "
+            f"delta={signal.target_delta:.2f} @ ${signal.target_price:.3f}"
+        )
 
     def on_trade(self, result: OrderResult) -> None:
-        pass  # Trades retrieved from store for rendering
+        order = result.order
+        mode = "PAPER" if order.dry_run else "LIVE"
+        if result.success:
+            logger.info(
+                f"{mode} {order.side.value} {order.signal.target.label} "
+                f"{order.signal.outcome}@{order.signal.market_id[:12]}.. "
+                f"{result.fill_size:.2f} shares @ ${result.fill_price:.3f} "
+                f"(${order.usd_amount:.2f})"
+            )
+        else:
+            logger.warning(
+                f"{mode} FAILED {order.side.value} {order.signal.target.label} "
+                f"{order.signal.outcome}@{order.signal.market_id[:12]}.. "
+                f"— {result.error}"
+            )
 
     def on_position_update(self, position: OurPosition) -> None:
-        pass  # Positions retrieved from store for rendering
+        logger.info(
+            f"Position {position.source_target} "
+            f"{position.outcome}@{position.market_id[:12]}.. "
+            f"size={position.size:.2f} avg=${position.avg_entry_price:.3f}"
+        )
 
     def on_redeemed(self, position: OurPosition, pnl: float) -> None:
-        pass
+        logger.info(
+            f"Redeemed {position.source_target} "
+            f"{position.outcome}@{position.market_id[:12]}.. "
+            f"P&L=${pnl:+.2f}"
+        )
 
     def on_error(self, error: str, context: dict) -> None:
         self._errors.append((error, context))
+        ctx_str = ", ".join(f"{k}={v}" for k, v in context.items())
+        logger.warning(f"Error: {error} ({ctx_str})")
 
     def on_status_change(self, status: str, detail: str) -> None:
         self._status = status
+        logger.info(f"Status: {status} — {detail}")
