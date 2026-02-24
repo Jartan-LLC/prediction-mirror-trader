@@ -40,7 +40,9 @@ def size_order(
     dry_run = settings.dry_run
 
     if signal.signal_type == SignalType.SELL:
-        return _size_sell(signal, current_price, our_position, settings, dry_run)
+        return _size_sell(
+            signal, current_price, our_position, settings, dry_run, trade_history,
+        )
 
     target = signal.target
     if target.sizing_mode == "conviction":
@@ -211,7 +213,7 @@ def _size_buy_proportional(
     ), None
 
 
-# ── Sell sizing (unchanged — percentage mirror) ──
+# ── Sell sizing ──
 
 
 def _size_sell(
@@ -220,18 +222,44 @@ def _size_sell(
     our_position: OurPosition | None,
     settings: Settings,
     dry_run: bool,
+    trade_history: list[float] | None = None,
 ) -> tuple[SizedOrder | None, str | None]:
     if our_position is None or our_position.size <= 0:
         return None, "no position to sell"
 
-    # Full exit: target_prev_size == delta means they sold everything
-    if signal.target_prev_size > 0 and abs(signal.target_delta - signal.target_prev_size) < 0.001:
-        raw_size = our_position.size
+    target = signal.target
+    trade_usd = signal.target_delta * signal.target_price
+    history = trade_history or []
+
+    # Determine what fraction of our position to sell
+    if target.sizing_mode == "conviction" and len(history) >= target.min_history:
+        base = target.trade_size_pct / 100
+        pct_rank = percentile_rank(trade_usd, history)
+        fraction = base * (1 + pct_rank)
+        raw_size = our_position.size * fraction * target.multiplier
+        sizing_detail = (
+            f"P{pct_rank * 100:.0f} conviction "
+            f"→ sell {fraction * 100:.1f}% of position"
+        )
+    elif target.sizing_mode == "conviction":
+        # Cold start for sells
+        fraction = (
+            target.cold_start_pct / 100
+            if target.cold_start_pct > 0
+            else target.trade_size_pct / 100
+        )
+        raw_size = our_position.size * fraction * target.multiplier
+        sizing_detail = (
+            f"cold start ({len(history)}/{target.min_history} trades)"
+        )
     else:
-        if signal.target_prev_size <= 0:
-            return None, "target_prev_size is zero"
-        reduction_pct = signal.target_delta / signal.target_prev_size
-        raw_size = our_position.size * reduction_pct
+        # Proportional mode — use target_prev_size if available
+        if signal.target_prev_size > 0:
+            reduction_pct = signal.target_delta / signal.target_prev_size
+            raw_size = our_position.size * reduction_pct
+        else:
+            raw_size = our_position.size * (target.trade_size_pct / 100)
+        sizing_detail = "proportional"
 
     # Cap at our actual holding
     raw_size = min(raw_size, our_position.size)
@@ -239,14 +267,21 @@ def _size_sell(
 
     # Skip if below minimum
     if usd_amount < settings.min_order_usd:
-        return None, f"below minimum order (${usd_amount:.4f} < ${settings.min_order_usd:.2f})"
+        return None, (
+            f"below minimum order (${usd_amount:.4f} < "
+            f"${settings.min_order_usd:.2f}, {sizing_detail})"
+        )
 
     # Slippage check
-    if not check_slippage(signal.target_price, current_price, settings.slippage_tolerance_pct):
+    if not check_slippage(
+        signal.target_price, current_price, settings.slippage_tolerance_pct
+    ):
         slip = _slippage_pct(signal.target_price, current_price)
         return None, (
-            f"slippage {slip:.1f}% exceeds {settings.slippage_tolerance_pct:.1f}% tolerance "
-            f"(signal=${signal.target_price:.3f}, current=${current_price:.3f})"
+            f"slippage {slip:.1f}% exceeds "
+            f"{settings.slippage_tolerance_pct:.1f}% tolerance "
+            f"(signal=${signal.target_price:.3f}, "
+            f"current=${current_price:.3f})"
         )
 
     return SizedOrder(
