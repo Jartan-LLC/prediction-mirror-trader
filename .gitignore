@@ -32,6 +32,7 @@ Thumbs.db
 
 # Project
 *.db
+*.log
 logs/
 
 # Testing

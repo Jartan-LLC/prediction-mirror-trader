@@ -363,6 +363,18 @@ def get_adapter_class(platform_name: str) -> type[PlatformAdapter]:
     return _REGISTRY[platform_name]
 ```
 
+Registration happens at module level in each platform's `__init__.py`:
+```python
+# platforms/polymarket/__init__.py
+from prediction_mirror.platforms import register_adapter
+from prediction_mirror.platforms.polymarket.adapter import PolymarketAdapter
+
+register_adapter("polymarket", PolymarketAdapter)
+```
+
+The startup sequence in `__main__.py` imports `platforms.polymarket` before calling
+`get_adapter_class()`, triggering registration.
+
 ### `platforms/polymarket/`
 
 **`config.py`** — Hardcoded public constants (Data API URL, contract addresses, chain ID 137).
