@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 
 from prediction_mirror.engine import executor, monitor, redeemer
 from prediction_mirror.engine.listener import EngineListener
+from prediction_mirror.models.signal import Signal, SignalType
 from prediction_mirror.platforms.base import PlatformAdapter
 from prediction_mirror.platforms.errors import TransientError
 
@@ -46,6 +47,7 @@ class Engine:
 
         self._tasks = [
             asyncio.create_task(self._monitor_loop()),
+            asyncio.create_task(self._reconciliation_loop()),
             asyncio.create_task(self._redeemer_loop()),
             asyncio.create_task(self._dashboard_loop()),
         ]
@@ -121,6 +123,54 @@ class Engine:
                         {"target": target.label, "transient": False},
                     )
                     logger.exception(f"Error polling target {target.label}")
+
+            await asyncio.sleep(settings.poll_interval_seconds)
+
+    async def _reconciliation_loop(self) -> None:
+        """Retry pending goals when market conditions improve."""
+        while self._running:
+            settings = self._store.get_settings()
+            pending = self._store.get_pending_goals()
+
+            if pending:
+                targets = {
+                    t.label: t for t in self._store.get_enabled_targets()
+                }
+                for goal in pending:
+                    target = targets.get(goal["target_label"])
+                    if not target:
+                        continue
+                    adapter = self._adapters.get(goal["platform"])
+                    if not adapter:
+                        continue
+
+                    # Construct synthetic signal from goal
+                    net = goal["net_delta"]
+                    sig_type = SignalType.BUY if net > 0 else SignalType.SELL
+                    synthetic = Signal(
+                        signal_type=sig_type,
+                        target=target,
+                        platform=goal["platform"],
+                        market_id=goal["market_id"],
+                        asset_id=goal["asset_id"],
+                        outcome=goal["outcome"],
+                        target_delta=abs(net),
+                        target_prev_size=0.0,
+                        target_price=goal["vwap"],
+                        detected_at=datetime.now(timezone.utc),
+                    )
+
+                    try:
+                        results = await executor.handle_signals(
+                            [synthetic], adapter, self._store, settings,
+                            dispatch=self._dispatch,
+                        )
+                    except Exception as e:
+                        logger.warning(
+                            f"Reconciliation error for "
+                            f"{goal['target_label']} "
+                            f"{goal['asset_id'][:12]}: {e}"
+                        )
 
             await asyncio.sleep(settings.poll_interval_seconds)
 

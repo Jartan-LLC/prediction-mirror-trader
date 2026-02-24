@@ -37,6 +37,20 @@ CREATE TABLE IF NOT EXISTS target_trade_history (
 );
 CREATE INDEX IF NOT EXISTS idx_trade_history_target ON target_trade_history(target_label);
 
+CREATE TABLE IF NOT EXISTS pending_goals (
+    target_label  TEXT NOT NULL,
+    market_id     TEXT NOT NULL,
+    asset_id      TEXT NOT NULL,
+    outcome       TEXT NOT NULL,
+    platform      TEXT NOT NULL,
+    net_delta     REAL NOT NULL,
+    vwap          REAL NOT NULL,
+    total_usd     REAL NOT NULL,
+    created_at    TEXT NOT NULL,
+    updated_at    TEXT NOT NULL,
+    PRIMARY KEY (target_label, market_id, asset_id)
+);
+
 CREATE TABLE IF NOT EXISTS signals (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     signal_type     TEXT    NOT NULL,

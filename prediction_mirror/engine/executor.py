@@ -108,7 +108,7 @@ async def _process_signal(
             logger.warning(f"Failed to fetch target positions for sell sizing: {e}")
 
     # Size the order
-    sized, skip_reason = size_order(
+    sized, skip_reason, retriable = size_order(
         signal=signal,
         current_price=current_price,
         portfolio_value=portfolio_value,
@@ -125,6 +125,12 @@ async def _process_signal(
             f"Skipped {signal.signal_type.value} {signal.target.label} "
             f"{signal.outcome}@{signal.market_id[:12]}.. — {skip_reason}"
         )
+        if retriable:
+            delta = signal.target_delta if signal.signal_type == SignalType.BUY else -signal.target_delta
+            store.upsert_goal(
+                signal.target.label, signal.market_id, signal.asset_id,
+                signal.outcome, signal.platform, delta, signal.target_price,
+            )
         return None
 
     # Execute
@@ -132,6 +138,28 @@ async def _process_signal(
         result = _paper_trade(sized)
     else:
         result = await _execute_with_retry(sized, adapter)
+
+    if result.success:
+        filled = result.fill_size or 0
+        # Reduce any pending goal for this asset
+        store.reduce_goal(
+            signal.target.label, signal.market_id, signal.asset_id, filled,
+        )
+        # Check for partial fill — unfilled remainder becomes a goal
+        if filled < sized.size:
+            remainder = sized.size - filled
+            delta = remainder if sized.side == OrderSide.BUY else -remainder
+            store.upsert_goal(
+                signal.target.label, signal.market_id, signal.asset_id,
+                signal.outcome, signal.platform, delta, current_price,
+            )
+    else:
+        # Execution failed — create goal for the full order
+        delta = sized.size if sized.side == OrderSide.BUY else -sized.size
+        store.upsert_goal(
+            signal.target.label, signal.market_id, signal.asset_id,
+            signal.outcome, signal.platform, delta, current_price,
+        )
 
     # Persist atomically
     _persist_result(store, result, signal_id, our_pos)

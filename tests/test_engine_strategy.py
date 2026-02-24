@@ -62,7 +62,7 @@ class TestSizeOrderBuy:
         from prediction_mirror.engine.strategy import size_order
 
         sig = _signal(delta=100.0, price=0.55)
-        result, reason = size_order(
+        result, reason, _ = size_order(
             signal=sig,
             current_price=0.55,
             portfolio_value=1000.0,
@@ -81,7 +81,7 @@ class TestSizeOrderBuy:
         from prediction_mirror.engine.strategy import size_order
 
         sig = _signal(delta=100.0, price=0.55)
-        result, _ = size_order(
+        result, _, _ = size_order(
             signal=sig,
             current_price=0.55,
             portfolio_value=1000.0,
@@ -97,7 +97,7 @@ class TestSizeOrderBuy:
         from prediction_mirror.engine.strategy import size_order
 
         sig = _signal(delta=10.0, price=0.55)
-        result, reason = size_order(
+        result, reason, _ = size_order(
             signal=sig,
             current_price=0.55,
             portfolio_value=1000.0,
@@ -114,7 +114,7 @@ class TestSizeOrderBuy:
 
         sig = _signal(delta=1000.0, price=0.55)
         settings = Settings(max_order_usd=10.0)
-        result, _ = size_order(
+        result, _, _ = size_order(
             signal=sig,
             current_price=0.55,
             portfolio_value=100000.0,
@@ -132,7 +132,7 @@ class TestSizeOrderBuy:
         sig = _signal(delta=1000.0, price=0.55)
         settings = Settings(max_position_usd=20.0)
         existing = _position(size=30.0, avg_entry=0.50)
-        result, _ = size_order(
+        result, _, _ = size_order(
             signal=sig,
             current_price=0.55,
             portfolio_value=100000.0,
@@ -149,7 +149,7 @@ class TestSizeOrderBuy:
 
         sig = _signal(delta=0.1, price=0.55)
         settings = Settings(min_order_usd=5.0)
-        result, reason = size_order(
+        result, reason, _ = size_order(
             signal=sig,
             current_price=0.55,
             portfolio_value=1000.0,
@@ -169,7 +169,7 @@ class TestSizeOrderBuy:
             allocation_pct=50.0, multiplier=2.0, sizing_mode="proportional",
         )
         sig = _signal(target=target, delta=10.0, price=0.55)
-        result, _ = size_order(
+        result, _, _ = size_order(
             signal=sig,
             current_price=0.55,
             portfolio_value=1000.0,
@@ -185,7 +185,7 @@ class TestSizeOrderBuy:
         from prediction_mirror.engine.strategy import size_order
 
         sig = _signal(delta=100.0, price=0.50)
-        result, reason = size_order(
+        result, reason, _ = size_order(
             signal=sig,
             current_price=0.60,  # 20% slippage
             portfolio_value=1000.0,
@@ -206,7 +206,7 @@ class TestSizeOrderSell:
 
         sig = _signal(signal_type=SignalType.SELL, delta=20.0, prev_size=100.0, price=0.55)
         existing = _position(size=10.0)
-        result, _ = size_order(
+        result, _, _ = size_order(
             signal=sig,
             current_price=0.55,
             portfolio_value=1000.0,
@@ -224,7 +224,7 @@ class TestSizeOrderSell:
 
         sig = _signal(signal_type=SignalType.SELL, delta=100.0, prev_size=100.0, price=0.55)
         existing = _position(size=10.0)
-        result, _ = size_order(
+        result, _, _ = size_order(
             signal=sig,
             current_price=0.55,
             portfolio_value=1000.0,
@@ -240,7 +240,7 @@ class TestSizeOrderSell:
         from prediction_mirror.engine.strategy import size_order
 
         sig = _signal(signal_type=SignalType.SELL, delta=10.0, prev_size=100.0)
-        result, reason = size_order(
+        result, reason, _ = size_order(
             signal=sig,
             current_price=0.55,
             portfolio_value=1000.0,
@@ -257,7 +257,7 @@ class TestSizeOrderSell:
 
         sig = _signal(signal_type=SignalType.SELL, delta=10.0, prev_size=100.0)
         existing = _position(size=0.0)
-        result, reason = size_order(
+        result, reason, _ = size_order(
             signal=sig,
             current_price=0.55,
             portfolio_value=1000.0,
@@ -274,7 +274,7 @@ class TestSizeOrderSell:
 
         sig = _signal(signal_type=SignalType.SELL, delta=1.0, prev_size=100.0, price=0.55)
         existing = _position(size=0.5)
-        result, reason = size_order(
+        result, reason, _ = size_order(
             signal=sig,
             current_price=0.55,
             portfolio_value=1000.0,
@@ -291,7 +291,7 @@ class TestSizeOrderSell:
 
         sig = _signal(signal_type=SignalType.SELL, delta=50.0, prev_size=100.0, price=0.50)
         existing = _position(size=10.0)
-        result, reason = size_order(
+        result, reason, _ = size_order(
             signal=sig,
             current_price=0.60,
             portfolio_value=1000.0,
@@ -378,7 +378,7 @@ class TestConvictionSizing:
         sig = _signal(target=CONVICTION_TARGET, delta=100.0, price=0.50)
         # Only 5 trades in history — below min_history of 10
         history = [10.0, 20.0, 30.0, 40.0, 50.0]
-        result, reason = size_order(
+        result, reason, _ = size_order(
             signal=sig, current_price=0.50, portfolio_value=1000.0,
             target_portfolio_value=0, deployed_for_target=0.0,
             our_position=None, settings=Settings(min_order_usd=0.01),
@@ -395,7 +395,7 @@ class TestConvictionSizing:
         sig = _signal(target=CONVICTION_TARGET, delta=10.0, price=0.50)
         # 10 trades: this trade (10*0.50=$5) is very small
         history = [5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 300.0, 400.0, 500.0, 1000.0]
-        result, _ = size_order(
+        result, _, _ = size_order(
             signal=sig, current_price=0.50, portfolio_value=1000.0,
             target_portfolio_value=0, deployed_for_target=0.0,
             our_position=None, settings=Settings(min_order_usd=0.01),
@@ -412,7 +412,7 @@ class TestConvictionSizing:
         sig = _signal(target=CONVICTION_TARGET, delta=2000.0, price=0.50)
         # trade_usd = $1000, above everything in history → P100
         history = [5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 300.0, 400.0, 500.0, 800.0]
-        result, _ = size_order(
+        result, _, _ = size_order(
             signal=sig, current_price=0.50, portfolio_value=1000.0,
             target_portfolio_value=0, deployed_for_target=0.0,
             our_position=None, settings=Settings(min_order_usd=0.01),
@@ -428,7 +428,7 @@ class TestConvictionSizing:
         sig = _signal(target=CONVICTION_TARGET, delta=1.0, price=0.50)
         # trade_usd=$0.50, below everything → P0
         history = [10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 90.0, 100.0]
-        result, _ = size_order(
+        result, _, _ = size_order(
             signal=sig, current_price=0.50, portfolio_value=1000.0,
             target_portfolio_value=0, deployed_for_target=0.0,
             our_position=None, settings=Settings(min_order_usd=0.01),
@@ -442,7 +442,7 @@ class TestConvictionSizing:
         from prediction_mirror.engine.strategy import size_order
 
         sig = _signal(target=CONVICTION_TARGET, delta=100.0, price=0.50)
-        result, _ = size_order(
+        result, _, _ = size_order(
             signal=sig, current_price=0.50, portfolio_value=1000.0,
             target_portfolio_value=0, deployed_for_target=0.0,
             our_position=None, settings=Settings(min_order_usd=0.01),
@@ -462,7 +462,7 @@ class TestConvictionSizing:
         sig = _signal(target=target, delta=100.0, price=0.50)
         # P100 → fraction = 5% * (1 + 1.0) = 10%
         history = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]
-        result, _ = size_order(
+        result, _, _ = size_order(
             signal=sig, current_price=0.50, portfolio_value=1000.0,
             target_portfolio_value=0, deployed_for_target=0.0,
             our_position=None, settings=Settings(min_order_usd=0.01),
@@ -480,7 +480,7 @@ class TestConvictionSizing:
             allocation_pct=50.0, sizing_mode="proportional",
         )
         sig = _signal(target=prop_target, delta=100.0, price=0.55)
-        result, _ = size_order(
+        result, _, _ = size_order(
             signal=sig, current_price=0.55, portfolio_value=1000.0,
             target_portfolio_value=5000.0, deployed_for_target=0.0,
             our_position=None, settings=Settings(min_order_usd=0.01),
@@ -498,7 +498,7 @@ class TestConvictionSizing:
             cold_start_pct=50.0,
         )
         sig = _signal(target=target, delta=100.0, price=0.50)
-        result, _ = size_order(
+        result, _, _ = size_order(
             signal=sig, current_price=0.50, portfolio_value=1000.0,
             target_portfolio_value=0, deployed_for_target=0.0,
             our_position=None, settings=Settings(min_order_usd=0.01, max_order_usd=10000.0),

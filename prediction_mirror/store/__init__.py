@@ -7,6 +7,7 @@ from prediction_mirror.models.position import OurPosition
 from prediction_mirror.models.settings import Settings
 from prediction_mirror.models.target import TargetConfig
 from prediction_mirror.store import (
+    goals,
     portfolio,
     settings,
     signals,
@@ -129,6 +130,25 @@ class Store:
 
     def get_trade_history(self, target_label: str, limit: int = 50) -> list[float]:
         return trade_history.get_recent_trades(self.conn, target_label, limit)
+
+    # ── Goals ──
+
+    def upsert_goal(
+        self, target_label, market_id, asset_id, outcome, platform, delta, price
+    ) -> None:
+        goals.upsert_goal(
+            self.conn, target_label, market_id, asset_id,
+            outcome, platform, delta, price,
+        )
+
+    def get_pending_goals(self, target_label=None) -> list:
+        return goals.get_pending_goals(self.conn, target_label)
+
+    def reduce_goal(self, target_label, market_id, asset_id, filled_delta) -> None:
+        goals.reduce_goal(self.conn, target_label, market_id, asset_id, filled_delta)
+
+    def delete_goal(self, target_label, market_id, asset_id) -> None:
+        goals.delete_goal(self.conn, target_label, market_id, asset_id)
 
 
 __all__ = ["Store", "init_db", "close"]
