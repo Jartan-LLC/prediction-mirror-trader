@@ -66,3 +66,30 @@ async def fetch_portfolio_value(
     """Sum of (size * current_price) for all positions."""
     positions = await fetch_positions(client, address)
     return sum(p.size * p.current_price for p in positions)
+
+
+async def fetch_trade_history(
+    client: httpx.AsyncClient, address: str, limit: int = 50
+) -> list[float]:
+    """Fetch recent trade USD values from the Data API activity endpoint."""
+    try:
+        resp = await client.get(
+            f"{DATA_API_URL}/activity",
+            params={"user": address, "type": "TRADE", "limit": limit},
+            timeout=10.0,
+        )
+    except httpx.TimeoutException as e:
+        raise TransientError(f"Data API timeout: {e}") from e
+    except httpx.ConnectError as e:
+        raise TransientError(f"Data API connection error: {e}") from e
+
+    if resp.status_code != 200:
+        _classify_http_error(resp.status_code, resp.text[:200])
+
+    data = resp.json()
+    values = []
+    for item in data if isinstance(data, list) else []:
+        usd = float(item.get("usdcSize", 0))
+        if usd > 0:
+            values.append(usd)
+    return values

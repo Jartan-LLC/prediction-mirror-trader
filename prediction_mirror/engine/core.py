@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from datetime import datetime, timezone
 
 from prediction_mirror.engine import executor, monitor, redeemer
 from prediction_mirror.engine.listener import EngineListener
@@ -49,6 +50,8 @@ class Engine:
         self._tasks: list[asyncio.Task] = []
         # Signal aggregation buffer: target_label → (signals, last_update_time)
         self._signal_buffer: dict[str, tuple[list[Signal], float]] = {}
+        # Targets whose trade history has been seeded this run
+        self._history_seeded: set[str] = set()
 
     def add_listener(self, listener: EngineListener) -> None:
         self._listeners.append(listener)
@@ -102,6 +105,11 @@ class Engine:
                 if adapter is None:
                     continue
 
+                # Seed trade history from Data API on first poll
+                if target.label not in self._history_seeded:
+                    self._history_seeded.add(target.label)
+                    await self._seed_trade_history(target, adapter)
+
                 try:
                     signals = await monitor.poll_target(
                         target, adapter, self._store
@@ -121,6 +129,27 @@ class Engine:
                     logger.exception(f"Error polling target {target.label}")
 
             await asyncio.sleep(settings.poll_interval_seconds)
+
+    async def _seed_trade_history(self, target, adapter) -> None:
+        """Fetch historical trades from the platform and seed trade history."""
+        try:
+            trade_values = await adapter.fetch_trade_history(
+                target.address, target.history_window
+            )
+            if trade_values:
+                now = datetime.now(timezone.utc)
+                for usd in trade_values:
+                    self._store.record_observed_trade(target.label, usd, now)
+                logger.info(
+                    f"Seeded {len(trade_values)} historical trades "
+                    f"for {target.label}"
+                )
+            else:
+                logger.info(f"No historical trades found for {target.label}")
+        except Exception as e:
+            logger.warning(
+                f"Failed to seed trade history for {target.label}: {e}"
+            )
 
     def _buffer_signals(self, target_label: str, signals: list[Signal]) -> None:
         """Add signals to the aggregation buffer for this target."""

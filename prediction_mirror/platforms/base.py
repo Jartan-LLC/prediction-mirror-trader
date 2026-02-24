@@ -37,6 +37,10 @@ class PlatformAdapter(ABC):
     async def fetch_target_portfolio_value(self, address: str) -> float:
         ...
 
+    async def fetch_trade_history(self, address: str, limit: int = 50) -> list[float]:
+        """Fetch recent trade USD values for a target. Returns empty if unsupported."""
+        return []
+
     # ── Read: Markets ──
 
     @abstractmethod
