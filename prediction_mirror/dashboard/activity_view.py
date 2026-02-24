@@ -58,7 +58,7 @@ def render_recent_trades(trades: list[sqlite3.Row], n: int = 5) -> Table:
     return table
 
 
-def render_pending_goals(goals: list[sqlite3.Row]) -> Table:
+def render_pending_goals(goals: list[sqlite3.Row], n: int = 5) -> Table:
     """Render pending reconciliation goals."""
     table = Table(title=f"PENDING GOALS ({len(goals)})", expand=True)
     table.add_column("Target")
@@ -68,7 +68,7 @@ def render_pending_goals(goals: list[sqlite3.Row]) -> Table:
     table.add_column("VWAP", justify="right")
     table.add_column("USD", justify="right")
 
-    for goal in goals:
+    for goal in goals[:n]:
         net = goal["net_delta"]
         side = "BUY" if net > 0 else "SELL"
         style = "green" if side == "BUY" else "red"

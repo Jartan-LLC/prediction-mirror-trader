@@ -4,7 +4,7 @@ from rich.table import Table
 
 from prediction_mirror.utils.formatting import fmt_pct, fmt_usd
 
-MAX_POSITIONS_SHOWN = 10
+MAX_POSITIONS_SHOWN = 6
 
 
 def render_allocation_table(allocation_summary: dict[str, dict]) -> Table:
@@ -12,9 +12,9 @@ def render_allocation_table(allocation_summary: dict[str, dict]) -> Table:
     table = Table(title="ALLOCATION", expand=True)
     table.add_column("Target", style="cyan")
     table.add_column("Alloc", justify="right")
-    table.add_column("Cash", justify="right", style="green")
+    table.add_column("Cash", justify="right")
     table.add_column("Deployed", justify="right")
-    table.add_column("Total", justify="right")
+    table.add_column("Total", justify="right", style="green")
 
     for label, info in allocation_summary.items():
         if label == "_reserve":
@@ -43,8 +43,6 @@ def render_positions_table(positions: list) -> Table:
     hidden = len(sorted_pos) - len(shown)
 
     title = f"POSITIONS ({len(sorted_pos)})"
-    if hidden > 0:
-        title += f" — showing top {MAX_POSITIONS_SHOWN}"
 
     table = Table(title=title, expand=True)
     table.add_column("Outcome", style="cyan")

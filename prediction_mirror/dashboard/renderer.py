@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from rich.columns import Columns
 from rich.console import Group
 from rich.panel import Panel
 from rich.text import Text
@@ -41,17 +42,18 @@ def render_dashboard(
     header = render_header(uptime, dry_run, target_count)
     alloc_table = render_allocation_table(allocation_summary)
     pos_table = render_positions_table(positions)
-    sig_table = render_recent_signals(signals)
     trade_table = render_recent_trades(trades)
+    sig_table = render_recent_signals(signals)
 
-    sections = [header, "", alloc_table, "", pos_table, "", trade_table, "", sig_table]
+    sections = [header, "", alloc_table, "", pos_table, "", trade_table]
 
+    # Signals and goals side by side
+    side_by_side = [sig_table]
     if goals:
-        goals_table = render_pending_goals(goals)
-        sections.extend(["", goals_table])
+        side_by_side.append(render_pending_goals(goals))
+    sections.extend(["", Columns(side_by_side, equal=True, expand=True)])
 
     if errors:
-        err_table = render_errors(errors)
-        sections.extend(["", err_table])
+        sections.extend(["", render_errors(errors)])
 
     return Panel(Group(*sections), expand=True)

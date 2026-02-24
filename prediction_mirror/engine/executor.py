@@ -46,11 +46,13 @@ async def _process_signal(
     track_goals: bool = True,
 ) -> OrderResult | None:
     """Process a single signal end-to-end."""
-    # Persist signal to audit log
-    signal_id = store.insert_signal(signal)
-
-    if dispatch:
-        dispatch("on_signal", signal)
+    # Persist signal to audit log (skip for reconciliation retries)
+    if track_goals:
+        signal_id = store.insert_signal(signal)
+        if dispatch:
+            dispatch("on_signal", signal)
+    else:
+        signal_id = 0
 
     # Gather context for sizing
     target_pv = 0.0
