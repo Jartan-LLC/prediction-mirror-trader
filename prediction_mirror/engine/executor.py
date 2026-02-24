@@ -50,17 +50,25 @@ async def _process_signal(
 
     # Gather context for sizing
     try:
-        wallet = await adapter.get_wallet_state()
         target_pv = await adapter.fetch_target_portfolio_value(signal.target.address)
     except Exception as e:
-        logger.warning(f"Failed to get context for sizing: {e}")
+        logger.warning(f"Failed to get target portfolio value: {e}")
         return None
 
     deployed = store.get_deployed_for_target(signal.target.label)
     our_pos = store.get_position(signal.market_id, signal.asset_id, signal.target.label)
 
-    # Calculate portfolio value (liquid + real deployed)
-    portfolio_value = wallet.total_balance + store.get_total_deployed()
+    # Calculate portfolio value
+    if settings.dry_run:
+        # Use simulated balance so paper trading works without real funds
+        portfolio_value = settings.dry_run_balance_usd + store.get_total_deployed()
+    else:
+        try:
+            wallet = await adapter.get_wallet_state()
+        except Exception as e:
+            logger.warning(f"Failed to get wallet state: {e}")
+            return None
+        portfolio_value = wallet.total_balance + store.get_total_deployed()
 
     # Get current price for sizing
     try:

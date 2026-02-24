@@ -29,6 +29,7 @@ Key-value pairs with hardcoded defaults. On every startup, `INSERT OR IGNORE` se
 | `redeemer_interval_seconds` | `7200` | How often to check for redemptions |
 | `dashboard_refresh_seconds` | `30` | Dashboard refresh rate |
 | `dry_run` | `true` | Paper trading mode |
+| `dry_run_balance_usd` | `1000.0` | Simulated starting balance for paper trading |
 | `log_level` | `INFO` | Logging verbosity |
 
 Managed via CLI: `python -m prediction_mirror settings set dry_run false`

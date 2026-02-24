@@ -14,6 +14,7 @@ DEFAULTS: dict[str, str] = {
     "redeemer_interval_seconds": "7200",
     "dashboard_refresh_seconds": "30",
     "dry_run": "true",
+    "dry_run_balance_usd": "1000.0",
     "log_level": "INFO",
 }
 
@@ -30,6 +31,7 @@ _FIELD_TYPES: dict[str, type] = {
     "redeemer_interval_seconds": int,
     "dashboard_refresh_seconds": int,
     "dry_run": bool,
+    "dry_run_balance_usd": float,
     "log_level": str,
 }
 

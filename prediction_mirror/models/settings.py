@@ -14,6 +14,7 @@ class Settings:
     redeemer_interval_seconds: int = 7200
     dashboard_refresh_seconds: int = 30
     dry_run: bool = True
+    dry_run_balance_usd: float = 1000.0
     log_level: str = "INFO"
 
     def __post_init__(self):
