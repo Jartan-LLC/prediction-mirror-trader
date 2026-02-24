@@ -79,7 +79,7 @@ async def _process_signal(
         return None
 
     # Size the order
-    sized = size_order(
+    sized, skip_reason = size_order(
         signal=signal,
         current_price=current_price,
         portfolio_value=portfolio_value,
@@ -90,7 +90,10 @@ async def _process_signal(
     )
 
     if sized is None:
-        logger.debug(f"Signal skipped (sizing returned None): {signal.market_id}")
+        logger.info(
+            f"Skipped {signal.signal_type.value} {signal.target.label} "
+            f"{signal.outcome}@{signal.market_id[:12]}.. — {skip_reason}"
+        )
         return None
 
     # Execute

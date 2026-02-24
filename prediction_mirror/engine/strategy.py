@@ -14,6 +14,12 @@ def check_slippage(signal_price: float, current_price: float, tolerance_pct: flo
     return slippage_pct <= tolerance_pct
 
 
+def _slippage_pct(signal_price: float, current_price: float) -> float:
+    if signal_price <= 0:
+        return 0.0
+    return abs(current_price - signal_price) / signal_price * 100
+
+
 def size_order(
     signal: Signal,
     current_price: float,
@@ -22,8 +28,8 @@ def size_order(
     deployed_for_target: float,
     our_position: OurPosition | None,
     settings: Settings,
-) -> SizedOrder | None:
-    """Pure calculation. Returns a SizedOrder or None if the order should be skipped."""
+) -> tuple[SizedOrder | None, str | None]:
+    """Pure calculation. Returns (SizedOrder, None) or (None, reason)."""
     dry_run = settings.dry_run
 
     if signal.signal_type == SignalType.SELL:
@@ -44,16 +50,16 @@ def _size_buy(
     our_position: OurPosition | None,
     settings: Settings,
     dry_run: bool,
-) -> SizedOrder | None:
+) -> tuple[SizedOrder | None, str | None]:
     target = signal.target
     target_budget = portfolio_value * (target.allocation_pct / 100)
     available = target_budget - deployed_for_target
 
     if available <= 0:
-        return None
+        return None, f"no budget available (budget=${target_budget:.2f}, deployed=${deployed_for_target:.2f})"
 
     if target_portfolio_value <= 0:
-        return None
+        return None, "target portfolio value is zero"
 
     ratio = target_budget / target_portfolio_value
     raw_size = signal.target_delta * ratio * target.multiplier
@@ -73,18 +79,22 @@ def _size_buy(
     existing_cost = our_position.total_cost if our_position else 0.0
     position_room = settings.max_position_usd - existing_cost
     if position_room <= 0:
-        return None
+        return None, f"max position reached (${existing_cost:.2f}/${settings.max_position_usd:.2f})"
     if usd_amount > position_room:
         usd_amount = position_room
         raw_size = usd_amount / current_price if current_price > 0 else 0
 
     # Skip if below minimum
     if usd_amount < settings.min_order_usd:
-        return None
+        return None, f"below minimum order (${usd_amount:.4f} < ${settings.min_order_usd:.2f})"
 
     # Slippage check
     if not check_slippage(signal.target_price, current_price, settings.slippage_tolerance_pct):
-        return None
+        slip = _slippage_pct(signal.target_price, current_price)
+        return None, (
+            f"slippage {slip:.1f}% exceeds {settings.slippage_tolerance_pct:.1f}% tolerance "
+            f"(signal=${signal.target_price:.3f}, current=${current_price:.3f})"
+        )
 
     return SizedOrder(
         signal=signal,
@@ -94,7 +104,7 @@ def _size_buy(
         size=raw_size,
         usd_amount=usd_amount,
         dry_run=dry_run,
-    )
+    ), None
 
 
 def _size_sell(
@@ -103,16 +113,16 @@ def _size_sell(
     our_position: OurPosition | None,
     settings: Settings,
     dry_run: bool,
-) -> SizedOrder | None:
+) -> tuple[SizedOrder | None, str | None]:
     if our_position is None or our_position.size <= 0:
-        return None
+        return None, "no position to sell"
 
     # Full exit: target_prev_size == delta means they sold everything
     if signal.target_prev_size > 0 and abs(signal.target_delta - signal.target_prev_size) < 0.001:
         raw_size = our_position.size
     else:
         if signal.target_prev_size <= 0:
-            return None
+            return None, "target_prev_size is zero"
         reduction_pct = signal.target_delta / signal.target_prev_size
         raw_size = our_position.size * reduction_pct
 
@@ -122,11 +132,15 @@ def _size_sell(
 
     # Skip if below minimum
     if usd_amount < settings.min_order_usd:
-        return None
+        return None, f"below minimum order (${usd_amount:.4f} < ${settings.min_order_usd:.2f})"
 
     # Slippage check
     if not check_slippage(signal.target_price, current_price, settings.slippage_tolerance_pct):
-        return None
+        slip = _slippage_pct(signal.target_price, current_price)
+        return None, (
+            f"slippage {slip:.1f}% exceeds {settings.slippage_tolerance_pct:.1f}% tolerance "
+            f"(signal=${signal.target_price:.3f}, current=${current_price:.3f})"
+        )
 
     return SizedOrder(
         signal=signal,
@@ -136,4 +150,4 @@ def _size_sell(
         size=raw_size,
         usd_amount=usd_amount,
         dry_run=dry_run,
-    )
+    ), None
