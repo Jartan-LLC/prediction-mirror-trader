@@ -11,7 +11,6 @@ def render_recent_signals(signals: list[sqlite3.Row], n: int = 10) -> Table:
     table.add_column("Time", style="dim", width=19)
     table.add_column("Type")
     table.add_column("Target")
-    table.add_column("Market", max_width=25)
     table.add_column("Outcome")
     table.add_column("Delta", justify="right")
 
@@ -23,7 +22,6 @@ def render_recent_signals(signals: list[sqlite3.Row], n: int = 10) -> Table:
             detected,
             f"[{style}]{sig_type}[/{style}]",
             row["target_label"],
-            row["market_id"][:23] + ".." if len(row["market_id"]) > 25 else row["market_id"],
             row["outcome"],
             f"{row['target_delta']:.1f}",
         )
