@@ -195,7 +195,7 @@ def targets_list(ctx):
     table.add_column("Mult", justify="right")
     table.add_column("Sizing")
     table.add_column("History", justify="right")
-    table.add_column("Floor/Ceil", justify="right")
+    table.add_column("Trade Size", justify="right")
     table.add_column("Enabled", justify="center")
 
     from prediction_mirror.utils.formatting import fmt_address
@@ -204,11 +204,11 @@ def targets_list(ctx):
         if t.sizing_mode == "conviction":
             sizing = f"conviction (cold {t.cold_start_pct:.0f}%)"
             history = f"{t.min_history}/{t.history_window}"
-            floor_ceil = f"{t.conviction_floor_pct:.0f}-{t.conviction_ceiling_pct:.0f}%"
+            trade_size = f"{t.trade_size_pct:.1f}%"
         else:
             sizing = "proportional"
             history = "-"
-            floor_ceil = "-"
+            trade_size = "-"
         table.add_row(
             t.label,
             t.platform,
@@ -217,7 +217,7 @@ def targets_list(ctx):
             f"{t.multiplier:.1f}",
             sizing,
             history,
-            floor_ceil,
+            trade_size,
             "[green]Yes[/green]" if t.enabled else "[red]No[/red]",
         )
 
@@ -239,13 +239,11 @@ def targets_list(ctx):
 @click.option("--history-window", default=50, type=int, help="Trades in conviction history window")
 @click.option("--min-history", default=10, type=int, help="Min trades before conviction activates")
 @click.option("--cold-start-pct", default=0.0, type=float, help="Budget % during cold start (0=observe only)")
-@click.option("--conviction-floor", default=10.0, type=float, help="Min budget % per trade")
-@click.option("--conviction-ceiling", default=90.0, type=float, help="Max budget % per trade")
+@click.option("--trade-size-pct", default=1.0, type=float, help="Base trade size as % of available budget")
 @click.pass_context
 def targets_add(
     ctx, label, address, platform, allocation, multiplier, enabled,
-    sizing_mode, history_window, min_history, cold_start_pct,
-    conviction_floor, conviction_ceiling,
+    sizing_mode, history_window, min_history, cold_start_pct, trade_size_pct,
 ):
     """Add a new target."""
     from prediction_mirror.models.target import TargetConfig
@@ -258,8 +256,7 @@ def targets_add(
             allocation_pct=allocation, multiplier=multiplier, enabled=enabled,
             sizing_mode=sizing_mode, history_window=history_window,
             min_history=min_history, cold_start_pct=cold_start_pct,
-            conviction_floor_pct=conviction_floor,
-            conviction_ceiling_pct=conviction_ceiling,
+            trade_size_pct=trade_size_pct,
         )
         store.add_target(target)
         console.print(f"[green]Added target: {label}[/green]")

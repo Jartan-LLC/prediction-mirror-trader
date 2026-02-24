@@ -77,6 +77,7 @@ def _size_buy_conviction(
 
     # This trade's USD value
     trade_usd = signal.target_delta * current_price
+    base = target.trade_size_pct / 100
 
     # Determine budget fraction based on conviction
     if len(trade_history) < target.min_history:
@@ -88,12 +89,11 @@ def _size_buy_conviction(
         )
     else:
         pct_rank = percentile_rank(trade_usd, trade_history)
-        floor = target.conviction_floor_pct / 100
-        ceiling = target.conviction_ceiling_pct / 100
-        fraction = floor + pct_rank * (ceiling - floor)
+        # base * (1 + percentile): P0 = 1x base, P50 = 1.5x, P100 = 2x
+        fraction = base * (1 + pct_rank)
         sizing_detail = (
             f"P{pct_rank * 100:.0f} conviction "
-            f"→ {fraction * 100:.0f}% of available"
+            f"→ {fraction * 100:.1f}% of available"
         )
 
     usd_amount = available * fraction * target.multiplier

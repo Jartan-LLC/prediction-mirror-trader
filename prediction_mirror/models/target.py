@@ -15,8 +15,7 @@ class TargetConfig:
     history_window: int = 50
     min_history: int = 10
     cold_start_pct: float = 0.0
-    conviction_floor_pct: float = 10.0
-    conviction_ceiling_pct: float = 90.0
+    trade_size_pct: float = 1.0
 
     def __post_init__(self):
         if not self.label:
@@ -26,17 +25,13 @@ class TargetConfig:
         if self.multiplier <= 0:
             raise ValueError(f"multiplier must be positive, got {self.multiplier}")
         if self.sizing_mode not in ("conviction", "proportional"):
-            raise ValueError(f"sizing_mode must be 'conviction' or 'proportional', got {self.sizing_mode!r}")
+            raise ValueError(
+                f"sizing_mode must be 'conviction' or 'proportional', "
+                f"got {self.sizing_mode!r}"
+            )
         if self.min_history < 10:
             raise ValueError(f"min_history must be >= 10, got {self.min_history}")
         if not 0 <= self.cold_start_pct <= 100:
             raise ValueError(f"cold_start_pct must be 0-100, got {self.cold_start_pct}")
-        if not 1 <= self.conviction_floor_pct <= 100:
-            raise ValueError(f"conviction_floor_pct must be 1-100, got {self.conviction_floor_pct}")
-        if not 1 <= self.conviction_ceiling_pct <= 100:
-            raise ValueError(f"conviction_ceiling_pct must be 1-100, got {self.conviction_ceiling_pct}")
-        if self.conviction_floor_pct >= self.conviction_ceiling_pct:
-            raise ValueError(
-                f"conviction_floor_pct ({self.conviction_floor_pct}) must be < "
-                f"conviction_ceiling_pct ({self.conviction_ceiling_pct})"
-            )
+        if not 0 < self.trade_size_pct <= 100:
+            raise ValueError(f"trade_size_pct must be 0-100, got {self.trade_size_pct}")

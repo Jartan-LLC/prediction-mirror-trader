@@ -22,8 +22,7 @@ CREATE TABLE IF NOT EXISTS targets (
     history_window  INTEGER NOT NULL DEFAULT 50,
     min_history     INTEGER NOT NULL DEFAULT 10,
     cold_start_pct  REAL    NOT NULL DEFAULT 0.0,
-    conviction_floor_pct   REAL NOT NULL DEFAULT 10.0,
-    conviction_ceiling_pct REAL NOT NULL DEFAULT 90.0,
+    trade_size_pct  REAL    NOT NULL DEFAULT 1.0,
     created_at      TEXT    NOT NULL,
     UNIQUE(platform, address)
 );
