@@ -6,6 +6,7 @@ from rich.text import Text
 
 from prediction_mirror.dashboard.activity_view import (
     render_errors,
+    render_pending_goals,
     render_recent_signals,
     render_recent_trades,
 )
@@ -33,6 +34,7 @@ def render_dashboard(
     positions: list,
     signals: list,
     trades: list,
+    goals: list,
     errors: list,
 ) -> Panel:
     """Compose the full dashboard as a rich Panel."""
@@ -41,9 +43,15 @@ def render_dashboard(
     pos_table = render_positions_table(positions)
     sig_table = render_recent_signals(signals)
     trade_table = render_recent_trades(trades)
-    err_table = render_errors(errors)
 
-    return Panel(
-        Group(header, "", alloc_table, "", pos_table, "", sig_table, "", trade_table, "", err_table),
-        expand=True,
-    )
+    sections = [header, "", alloc_table, "", pos_table, "", trade_table, "", sig_table]
+
+    if goals:
+        goals_table = render_pending_goals(goals)
+        sections.extend(["", goals_table])
+
+    if errors:
+        err_table = render_errors(errors)
+        sections.extend(["", err_table])
+
+    return Panel(Group(*sections), expand=True)

@@ -53,8 +53,9 @@ class DashboardListener:
         settings = self._store.get_settings()
         targets = self._store.get_all_targets()
         positions = [p for p in self._store.get_all_positions() if p.size > 0]
-        recent_signals = self._store.get_signal_history(limit=10)
-        recent_trades = self._store.get_recent_trades(limit=10)
+        recent_signals = self._store.get_signal_history(limit=5)
+        recent_trades = self._store.get_recent_trades(limit=5)
+        pending_goals = self._store.get_pending_goals()
 
         if settings.dry_run:
             cash = settings.dry_run_cash
@@ -77,6 +78,7 @@ class DashboardListener:
             positions=positions,
             signals=recent_signals,
             trades=recent_trades,
+            goals=pending_goals,
             errors=self.errors,
         )
         self._live.update(panel)

@@ -108,6 +108,7 @@ class TestRenderDashboard:
             positions=[],
             signals=[],
             trades=[],
+            goals=[],
             errors=[],
         )
         # Just verify it produces a renderable without error
