@@ -9,9 +9,10 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Track which targets have had their first poll (baseline recorded).
-# Survives across ticks within a single engine run.
-_baselined_targets: set[str] = set()
+# Targets that have been baselined this run. Reset on every bot restart,
+# so we always re-snapshot current state and only mirror changes from
+# this point forward (no catch-up on trades missed while the bot was down).
+_baselined: set[str] = set()
 
 
 def diff_positions(
@@ -92,22 +93,22 @@ async def poll_target(
 ) -> list[Signal]:
     """Fetch current positions, diff against snapshot, return signals."""
     new_positions = await adapter.fetch_target_positions(target.address)
-    old_positions = store.get_all_snapshots(target.address)
 
-    # First poll: record baseline, don't signal.
-    # We only want to mirror *changes*, not the target's entire existing portfolio.
+    # On the first poll this run, snapshot current state as baseline.
+    # This ensures we never try to catch up on trades missed while
+    # the bot was down — we only mirror changes from now on.
     target_key = f"{target.platform}:{target.address}"
-    if target_key not in _baselined_targets:
-        _baselined_targets.add(target_key)
-        if not old_positions:
-            logger.info(
-                f"First poll for {target.label}: recording {len(new_positions)} "
-                f"positions as baseline (no signals generated)"
-            )
-            for pos in new_positions:
-                store.upsert_snapshot(pos)
-            return []
+    if target_key not in _baselined:
+        _baselined.add(target_key)
+        logger.info(
+            f"Baseline for {target.label}: {len(new_positions)} positions "
+            f"(no signals generated)"
+        )
+        for pos in new_positions:
+            store.upsert_snapshot(pos)
+        return []
 
+    old_positions = store.get_all_snapshots(target.address)
     signals = diff_positions(old_positions, new_positions, target)
 
     # Update snapshots
