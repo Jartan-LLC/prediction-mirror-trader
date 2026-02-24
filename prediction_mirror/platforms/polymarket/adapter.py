@@ -93,6 +93,9 @@ class PolymarketAdapter(PlatformAdapter):
     async def fetch_trade_history(self, address: str, limit: int = 50) -> list[float]:
         return await data_api.fetch_trade_history(self._http, address, limit)
 
+    async def fetch_activity_since(self, address: str, since_ts: int) -> list[dict]:
+        return await data_api.fetch_activity_since(self._http, address, since_ts)
+
     # ── Read: Markets ──
 
     async def fetch_market(self, market_id: str) -> Market:

@@ -93,3 +93,34 @@ async def fetch_trade_history(
         if usd > 0:
             values.append(usd)
     return values
+
+
+async def fetch_activity_since(
+    client: httpx.AsyncClient, address: str, since_ts: int
+) -> list[dict]:
+    """Fetch trades since a unix timestamp. Returns raw activity dicts."""
+    try:
+        params = {"user": address, "type": "TRADE"}
+        if since_ts > 0:
+            params["startTs"] = since_ts
+        resp = await client.get(
+            f"{DATA_API_URL}/activity",
+            params=params,
+            timeout=10.0,
+        )
+    except httpx.TimeoutException as e:
+        raise TransientError(f"Data API timeout: {e}") from e
+    except httpx.ConnectError as e:
+        raise TransientError(f"Data API connection error: {e}") from e
+
+    if resp.status_code != 200:
+        _classify_http_error(resp.status_code, resp.text[:200])
+
+    data = resp.json()
+    if not isinstance(data, list):
+        return []
+    # Filter to trades strictly after since_ts (endpoint may be inclusive)
+    return [
+        item for item in data
+        if int(item.get("timestamp", 0)) > since_ts
+    ]

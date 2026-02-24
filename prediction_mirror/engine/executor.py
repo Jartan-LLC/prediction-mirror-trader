@@ -48,12 +48,6 @@ async def _process_signal(
     if dispatch:
         dispatch("on_signal", signal)
 
-    # Record observed trade value for conviction sizing history.
-    # Done for ALL signals (even ones we'll skip) to build the distribution.
-    trade_usd = signal.target_delta * signal.target_price
-    if trade_usd > 0:
-        store.record_observed_trade(signal.target.label, trade_usd, signal.detected_at)
-
     # Gather context for sizing
     target_pv = 0.0
     if signal.target.sizing_mode == "proportional":

@@ -3,14 +3,13 @@ from __future__ import annotations
 import sqlite3
 
 from prediction_mirror.models.order import OrderResult
-from prediction_mirror.models.position import OurPosition, TargetPosition
+from prediction_mirror.models.position import OurPosition
 from prediction_mirror.models.settings import Settings
 from prediction_mirror.models.target import TargetConfig
 from prediction_mirror.store import (
     portfolio,
     settings,
     signals,
-    snapshots,
     targets,
     trade_history,
     trades,
@@ -63,19 +62,6 @@ class Store:
 
     def set_allocation(self, label: str, pct: float) -> None:
         targets.set_allocation(self.conn, label, pct)
-
-    # ── Snapshots ──
-
-    def upsert_snapshot(self, pos: TargetPosition) -> None:
-        snapshots.upsert_snapshot(self.conn, pos)
-
-    def get_snapshot(
-        self, target_address: str, platform: str, market_id: str, asset_id: str
-    ) -> TargetPosition | None:
-        return snapshots.get_snapshot(self.conn, target_address, platform, market_id, asset_id)
-
-    def get_all_snapshots(self, target_address: str) -> list[TargetPosition]:
-        return snapshots.get_all_snapshots(self.conn, target_address)
 
     # ── Signals ──
 

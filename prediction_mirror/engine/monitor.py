@@ -1,126 +1,112 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 
-from prediction_mirror.models.position import TargetPosition
 from prediction_mirror.models.signal import Signal, SignalType
 from prediction_mirror.models.target import TargetConfig
-import logging
 
 logger = logging.getLogger(__name__)
 
-# Targets that have been baselined this run. Reset on every bot restart,
-# so we always re-snapshot current state and only mirror changes from
-# this point forward (no catch-up on trades missed while the bot was down).
-_baselined: set[str] = set()
 
-
-def diff_positions(
-    old: list[TargetPosition],
-    new: list[TargetPosition],
-    target: TargetConfig,
-    dust_threshold: float = 0.01,
+def _activity_to_signals(
+    trades: list[dict], target: TargetConfig
 ) -> list[Signal]:
-    """Pure function: diff old vs new positions, return signals.
+    """Convert raw activity trades to Signals, merging fragments.
 
-    No I/O, no side effects. Keys positions by (market_id, asset_id).
+    Trades for the same (market, asset, side) are merged: sizes summed,
+    price is volume-weighted average.
     """
-    old_map = {(p.market_id, p.asset_id): p for p in old}
-    new_map = {(p.market_id, p.asset_id): p for p in new}
+    # Group by (conditionId, asset, side)
+    groups: dict[tuple, list[dict]] = {}
+    for trade in trades:
+        key = (
+            trade.get("conditionId", ""),
+            trade.get("asset", ""),
+            trade.get("side", ""),
+        )
+        groups.setdefault(key, []).append(trade)
 
     signals: list[Signal] = []
-    now = datetime.now(timezone.utc)
+    for (condition_id, asset_id, side), group in groups.items():
+        total_size = sum(float(t.get("size", 0)) for t in group)
+        total_usd = sum(float(t.get("usdcSize", 0)) for t in group)
+        # Volume-weighted average price
+        vwap = total_usd / total_size if total_size > 0 else 0.0
+        latest_ts = max(int(t.get("timestamp", 0)) for t in group)
+        outcome = group[0].get("outcome", "")
 
-    # Check new or increased positions
-    for key, new_pos in new_map.items():
-        old_pos = old_map.get(key)
-        old_size = old_pos.size if old_pos else 0.0
-        delta = new_pos.size - old_size
-
-        if abs(delta) < dust_threshold:
+        if total_size <= 0:
             continue
 
-        if delta > 0:
-            signals.append(Signal(
-                signal_type=SignalType.BUY,
-                target=target,
-                platform=new_pos.platform,
-                market_id=new_pos.market_id,
-                asset_id=new_pos.asset_id,
-                outcome=new_pos.outcome,
-                target_delta=delta,
-                target_prev_size=old_size,
-                target_price=new_pos.current_price,
-                detected_at=now,
-            ))
-        elif delta < 0:
-            signals.append(Signal(
-                signal_type=SignalType.SELL,
-                target=target,
-                platform=new_pos.platform,
-                market_id=new_pos.market_id,
-                asset_id=new_pos.asset_id,
-                outcome=new_pos.outcome,
-                target_delta=abs(delta),
-                target_prev_size=old_size,
-                target_price=new_pos.current_price,
-                detected_at=now,
-            ))
+        signal_type = SignalType.BUY if side == "BUY" else SignalType.SELL
 
-    # Check positions that disappeared (full exit)
-    for key, old_pos in old_map.items():
-        if key not in new_map and old_pos.size >= dust_threshold:
-            signals.append(Signal(
-                signal_type=SignalType.SELL,
-                target=target,
-                platform=old_pos.platform,
-                market_id=old_pos.market_id,
-                asset_id=old_pos.asset_id,
-                outcome=old_pos.outcome,
-                target_delta=old_pos.size,
-                target_prev_size=old_pos.size,
-                target_price=old_pos.current_price,
-                detected_at=now,
-            ))
+        signals.append(Signal(
+            signal_type=signal_type,
+            target=target,
+            platform=target.platform,
+            market_id=condition_id,
+            asset_id=asset_id,
+            outcome=outcome,
+            target_delta=total_size,
+            target_prev_size=0.0,
+            target_price=vwap,
+            detected_at=datetime.fromtimestamp(latest_ts, tz=timezone.utc),
+        ))
 
     return signals
 
 
-async def poll_target(
+async def poll_activity(
     target: TargetConfig,
     adapter,
     store,
 ) -> list[Signal]:
-    """Fetch current positions, diff against snapshot, return signals."""
-    new_positions = await adapter.fetch_target_positions(target.address)
+    """Fetch new trades from /activity since last check, return merged signals."""
+    from prediction_mirror.store.targets import (
+        get_last_activity_ts,
+        update_activity_ts,
+    )
 
-    # On the first poll this run, snapshot current state as baseline.
-    # This ensures we never try to catch up on trades missed while
-    # the bot was down — we only mirror changes from now on.
-    target_key = f"{target.platform}:{target.address}"
-    if target_key not in _baselined:
-        _baselined.add(target_key)
+    last_ts = get_last_activity_ts(store.conn, target.label)
+
+    if last_ts == 0:
+        # First poll — set to now, don't replay old trades
+        import time
+        now_ts = int(time.time())
+        update_activity_ts(store.conn, target.label, now_ts)
         logger.info(
-            f"Baseline for {target.label}: {len(new_positions)} positions "
-            f"(no signals generated)"
+            f"Initialized activity tracking for {target.label} "
+            f"(starting from now)"
         )
-        for pos in new_positions:
-            store.upsert_snapshot(pos)
         return []
 
-    old_positions = store.get_all_snapshots(target.address)
-    signals = diff_positions(old_positions, new_positions, target)
+    trades = await adapter.fetch_activity_since(target.address, last_ts)
 
-    # Update snapshots — upsert current positions and remove exited ones
-    new_keys = {(pos.market_id, pos.asset_id) for pos in new_positions}
-    for pos in new_positions:
-        store.upsert_snapshot(pos)
-    for old_pos in old_positions:
-        if (old_pos.market_id, old_pos.asset_id) not in new_keys:
-            # Position disappeared — delete the stale snapshot so we don't
-            # generate the same SELL signal on every subsequent poll
-            from prediction_mirror.store.snapshots import delete_snapshot
-            delete_snapshot(store.conn, old_pos.target_address, old_pos.platform,
-                           old_pos.market_id, old_pos.asset_id)
+    if not trades:
+        return []
+
+    # Update last_activity_ts to the latest trade
+    max_ts = max(int(t.get("timestamp", 0)) for t in trades)
+    update_activity_ts(store.conn, target.label, max_ts)
+
+    # Record trade USD values for conviction history
+    for trade in trades:
+        usd = float(trade.get("usdcSize", 0))
+        if usd > 0:
+            ts = datetime.fromtimestamp(
+                int(trade.get("timestamp", 0)), tz=timezone.utc
+            )
+            store.record_observed_trade(target.label, usd, ts)
+
+    signals = _activity_to_signals(trades, target)
+
+    if signals:
+        merged_note = ""
+        if len(trades) != len(signals):
+            merged_note = f" (merged from {len(trades)} trades)"
+        logger.info(
+            f"{target.label}: {len(signals)} signals{merged_note}"
+        )
 
     return signals

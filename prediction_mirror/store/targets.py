@@ -141,3 +141,19 @@ def set_allocation(conn: sqlite3.Connection, label: str, pct: float) -> None:
 def validate_allocations(conn: sqlite3.Connection) -> bool:
     total = _get_total_allocation(conn)
     return total <= 100.0
+
+
+def get_last_activity_ts(conn: sqlite3.Connection, label: str) -> int:
+    row = conn.execute(
+        "SELECT last_activity_ts FROM targets WHERE label = ?", (label,)
+    ).fetchone()
+    if row is None:
+        return 0
+    return row["last_activity_ts"]
+
+
+def update_activity_ts(conn: sqlite3.Connection, label: str, ts: int) -> None:
+    conn.execute(
+        "UPDATE targets SET last_activity_ts = ? WHERE label = ?", (ts, label)
+    )
+    conn.commit()

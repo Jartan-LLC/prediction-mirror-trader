@@ -41,6 +41,10 @@ class PlatformAdapter(ABC):
         """Fetch recent trade USD values for a target. Returns empty if unsupported."""
         return []
 
+    async def fetch_activity_since(self, address: str, since_ts: int) -> list[dict]:
+        """Fetch trades since a unix timestamp. Returns raw trade dicts."""
+        return []
+
     # ── Read: Markets ──
 
     @abstractmethod

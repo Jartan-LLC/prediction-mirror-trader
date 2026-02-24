@@ -225,7 +225,6 @@ class TestSettings:
         assert settings.min_order_usd == 1.0
         assert settings.max_order_usd == 500.0
         assert settings.max_position_usd == 1000.0
-        assert settings.aggregation_window_seconds == 0
         assert settings.redeemer_interval_seconds == 7200
         assert settings.dashboard_refresh_seconds == 30
         assert settings.dry_run is True

@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS targets (
     cold_start_pct  REAL    NOT NULL DEFAULT 0.0,
     trade_size_pct  REAL    NOT NULL DEFAULT 1.0,
     aggregation_seconds INTEGER NOT NULL DEFAULT 7,
+    last_activity_ts INTEGER NOT NULL DEFAULT 0,
     created_at      TEXT    NOT NULL,
     UNIQUE(platform, address)
 );
@@ -35,19 +36,6 @@ CREATE TABLE IF NOT EXISTS target_trade_history (
     detected_at     TEXT    NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_trade_history_target ON target_trade_history(target_label);
-
-CREATE TABLE IF NOT EXISTS target_snapshots (
-    target_address  TEXT    NOT NULL,
-    platform        TEXT    NOT NULL,
-    market_id       TEXT    NOT NULL,
-    asset_id        TEXT    NOT NULL,
-    outcome         TEXT    NOT NULL,
-    size            REAL    NOT NULL,
-    avg_price       REAL,
-    current_price   REAL,
-    snapshot_time   TEXT    NOT NULL,
-    PRIMARY KEY (target_address, platform, market_id, asset_id)
-);
 
 CREATE TABLE IF NOT EXISTS signals (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,

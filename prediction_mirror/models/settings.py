@@ -10,7 +10,6 @@ class Settings:
     min_order_usd: float = 1.0
     max_order_usd: float = 500.0
     max_position_usd: float = 1000.0
-    aggregation_window_seconds: int = 0
     redeemer_interval_seconds: int = 7200
     dashboard_refresh_seconds: int = 30
     dry_run: bool = True
