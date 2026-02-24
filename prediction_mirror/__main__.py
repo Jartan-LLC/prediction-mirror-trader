@@ -204,7 +204,7 @@ def targets_list(ctx):
         if t.sizing_mode == "conviction":
             sizing = f"conviction (cold {t.cold_start_pct:.0f}%)"
             history = f"{t.min_history}/{t.history_window}"
-            trade_size = f"{t.trade_size_pct:.1f}%"
+            trade_size = f"{t.trade_size_pct:.1f}% agg={t.aggregation_seconds}s"
         else:
             sizing = "proportional"
             history = "-"
@@ -240,10 +240,12 @@ def targets_list(ctx):
 @click.option("--min-history", default=10, type=int, help="Min trades before conviction activates")
 @click.option("--cold-start-pct", default=0.0, type=float, help="Budget % during cold start (0=observe only)")
 @click.option("--trade-size-pct", default=1.0, type=float, help="Base trade size as % of available budget")
+@click.option("--aggregation-seconds", default=7, type=int, help="Seconds to batch signals before executing")
 @click.pass_context
 def targets_add(
     ctx, label, address, platform, allocation, multiplier, enabled,
     sizing_mode, history_window, min_history, cold_start_pct, trade_size_pct,
+    aggregation_seconds,
 ):
     """Add a new target."""
     from prediction_mirror.models.target import TargetConfig
@@ -257,6 +259,7 @@ def targets_add(
             sizing_mode=sizing_mode, history_window=history_window,
             min_history=min_history, cold_start_pct=cold_start_pct,
             trade_size_pct=trade_size_pct,
+            aggregation_seconds=aggregation_seconds,
         )
         store.add_target(target)
         console.print(f"[green]Added target: {label}[/green]")

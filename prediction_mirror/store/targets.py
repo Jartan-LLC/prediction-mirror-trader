@@ -19,6 +19,7 @@ def _row_to_target(row: sqlite3.Row) -> TargetConfig:
         min_history=row["min_history"],
         cold_start_pct=row["cold_start_pct"],
         trade_size_pct=row["trade_size_pct"],
+        aggregation_seconds=row["aggregation_seconds"],
     )
 
 
@@ -47,8 +48,8 @@ def add_target(conn: sqlite3.Connection, target: TargetConfig) -> None:
     conn.execute(
         "INSERT INTO targets (label, platform, address, allocation_pct, multiplier, enabled, "
         "sizing_mode, history_window, min_history, cold_start_pct, "
-        "trade_size_pct, created_at) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "trade_size_pct, aggregation_seconds, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             target.label,
             target.platform,
@@ -61,6 +62,7 @@ def add_target(conn: sqlite3.Connection, target: TargetConfig) -> None:
             target.min_history,
             target.cold_start_pct,
             target.trade_size_pct,
+            target.aggregation_seconds,
             now,
         ),
     )

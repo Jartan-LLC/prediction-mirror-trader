@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS targets (
     min_history     INTEGER NOT NULL DEFAULT 10,
     cold_start_pct  REAL    NOT NULL DEFAULT 0.0,
     trade_size_pct  REAL    NOT NULL DEFAULT 1.0,
+    aggregation_seconds INTEGER NOT NULL DEFAULT 7,
     created_at      TEXT    NOT NULL,
     UNIQUE(platform, address)
 );

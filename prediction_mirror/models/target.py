@@ -16,6 +16,7 @@ class TargetConfig:
     min_history: int = 10
     cold_start_pct: float = 0.0
     trade_size_pct: float = 1.0
+    aggregation_seconds: int = 7
 
     def __post_init__(self):
         if not self.label:
@@ -35,3 +36,7 @@ class TargetConfig:
             raise ValueError(f"cold_start_pct must be 0-100, got {self.cold_start_pct}")
         if not 0 < self.trade_size_pct <= 100:
             raise ValueError(f"trade_size_pct must be 0-100, got {self.trade_size_pct}")
+        if self.aggregation_seconds < 0:
+            raise ValueError(
+                f"aggregation_seconds must be >= 0, got {self.aggregation_seconds}"
+            )
