@@ -215,6 +215,13 @@ class Engine:
         while self._running:
             settings = self._store.get_settings()
             for listener in self._listeners:
+                # Update price cache for mark-to-market
+                update_prices = getattr(listener, "update_prices", None)
+                if update_prices:
+                    try:
+                        await update_prices(self._adapters)
+                    except Exception:
+                        pass
                 render = getattr(listener, "render", None)
                 if render:
                     try:

@@ -33,15 +33,20 @@ def render_dashboard(
     target_count: int,
     allocation_summary: dict,
     positions: list,
-    signals: list,
-    trades: list,
-    goals: list,
-    errors: list,
+    price_map: dict | None = None,
+    signals: list = None,
+    trades: list = None,
+    goals: list = None,
+    errors: list = None,
 ) -> Panel:
     """Compose the full dashboard as a rich Panel."""
+    signals = signals or []
+    trades = trades or []
+    goals = goals or []
+    errors = errors or []
     header = render_header(uptime, dry_run, target_count)
     alloc_table = render_allocation_table(allocation_summary)
-    pos_table = render_positions_table(positions)
+    pos_table = render_positions_table(positions, price_map=price_map)
     trade_table = render_recent_trades(trades)
     sig_table = render_recent_signals(signals)
 

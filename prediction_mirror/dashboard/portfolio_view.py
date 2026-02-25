@@ -35,9 +35,12 @@ def render_allocation_table(allocation_summary: dict[str, dict]) -> Table:
     return table
 
 
-def render_positions_table(positions: list) -> Table:
+def render_positions_table(
+    positions: list, price_map: dict | None = None
+) -> Table:
     """Render our current positions, sorted by value, capped."""
-    # Sort by total_cost descending (most valuable first)
+    price_map = price_map or {}
+
     sorted_pos = sorted(positions, key=lambda p: p.total_cost, reverse=True)
     shown = sorted_pos[:MAX_POSITIONS_SHOWN]
     hidden = len(sorted_pos) - len(shown)
@@ -49,20 +52,35 @@ def render_positions_table(positions: list) -> Table:
     table.add_column("Size", justify="right")
     table.add_column("Entry", justify="right")
     table.add_column("Cost", justify="right")
+    table.add_column("Value", justify="right")
+    table.add_column("P&L", justify="right")
     table.add_column("Source", style="dim")
 
     for pos in shown:
+        cur_price = price_map.get(pos.asset_id)
+        if cur_price is not None and cur_price > 0:
+            value = pos.size * cur_price
+            pnl = value - pos.total_cost
+            pnl_style = "green" if pnl >= 0 else "red"
+            value_str = fmt_usd(value)
+            pnl_str = f"[{pnl_style}]{fmt_usd(pnl)}[/{pnl_style}]"
+        else:
+            value_str = "-"
+            pnl_str = "-"
+
         table.add_row(
             pos.outcome,
             f"{pos.size:.1f}",
             fmt_usd(pos.avg_entry_price),
             fmt_usd(pos.total_cost),
+            value_str,
+            pnl_str,
             pos.source_target,
         )
 
     if hidden > 0:
         table.add_row(
-            f"... +{hidden} more", "", "", "", "",
+            f"... +{hidden} more", "", "", "", "", "", "",
             style="dim",
         )
 

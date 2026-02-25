@@ -24,6 +24,8 @@ class DashboardListener:
         self._start_time = time.monotonic()
         self._errors: deque[tuple[str, dict]] = deque(maxlen=max_errors)
         self._status = "starting"
+        # asset_id → current_price, updated periodically
+        self._price_cache: dict[str, float] = {}
 
     @property
     def uptime(self) -> str:
@@ -45,6 +47,20 @@ class DashboardListener:
     def errors(self) -> list[tuple[str, dict]]:
         return list(self._errors)
 
+    async def update_prices(self, adapters: dict) -> None:
+        """Fetch current prices for all targets' positions."""
+        try:
+            targets = self._store.get_enabled_targets()
+            for target in targets:
+                adapter = adapters.get(target.platform)
+                if not adapter:
+                    continue
+                positions = await adapter.fetch_target_positions(target.address)
+                for p in positions:
+                    self._price_cache[p.asset_id] = p.current_price
+        except Exception:
+            pass  # Don't crash dashboard for price fetch failures
+
     def render(self) -> None:
         """Re-render the dashboard. Called periodically and on events."""
         if not self._live:
@@ -56,6 +72,9 @@ class DashboardListener:
         recent_signals = self._store.get_signal_history(limit=5)
         recent_trades = self._store.get_recent_trades(limit=5)
         pending_goals = self._store.get_pending_goals()
+
+        # Build current price map from cached prices (updated in background)
+        price_map = self._price_cache
 
         if settings.dry_run:
             cash = settings.dry_run_cash
@@ -76,6 +95,7 @@ class DashboardListener:
             target_count=len([t for t in targets if t.enabled]),
             allocation_summary=allocation,
             positions=positions,
+            price_map=price_map,
             signals=recent_signals,
             trades=recent_trades,
             goals=pending_goals,
