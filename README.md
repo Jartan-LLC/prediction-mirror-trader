@@ -31,7 +31,7 @@ Poll /activity → Detect trades → Aggregate fragments → Size orders → Exe
 
 ```bash
 # Clone and install
-git clone https://github.com/YOUR_USER/prediction-mirror-trader.git
+git clone https://github.com/Jartan-LLC/prediction-mirror-trader.git
 cd prediction-mirror-trader
 pip install -e ".[dev]"
 
