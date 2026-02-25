@@ -144,17 +144,40 @@ class Engine:
                     if not adapter:
                         continue
 
-                    # Construct synthetic signal from goal
                     net = goal["net_delta"]
-                    sig_type = SignalType.BUY if net > 0 else SignalType.SELL
+
+                    # Only sell goals should exist, but guard against stale buys
+                    if net > 0:
+                        self._store.delete_goal(
+                            goal["target_label"], goal["market_id"],
+                            goal["asset_id"],
+                        )
+                        continue
+
+                    # Check if we still hold this position
+                    our_pos = self._store.get_position(
+                        goal["market_id"], goal["asset_id"],
+                        goal["target_label"],
+                    )
+                    if our_pos is None or our_pos.size <= 0:
+                        # Nothing to sell — delete the goal
+                        self._store.delete_goal(
+                            goal["target_label"], goal["market_id"],
+                            goal["asset_id"],
+                        )
+                        continue
+
+                    # Cap delta at what we actually hold
+                    sell_delta = min(abs(net), our_pos.size)
+
                     synthetic = Signal(
-                        signal_type=sig_type,
+                        signal_type=SignalType.SELL,
                         target=target,
                         platform=goal["platform"],
                         market_id=goal["market_id"],
                         asset_id=goal["asset_id"],
                         outcome=goal["outcome"],
-                        target_delta=abs(net),
+                        target_delta=sell_delta,
                         target_prev_size=0.0,
                         target_price=goal["vwap"],
                         detected_at=datetime.now(timezone.utc),

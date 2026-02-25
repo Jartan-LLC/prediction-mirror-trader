@@ -147,10 +147,11 @@ async def _process_signal(
 
     if result.success:
         filled = result.fill_size or 0
-        # Reduce any pending goal for this asset
-        store.reduce_goal(
-            signal.target.label, signal.market_id, signal.asset_id, filled,
-        )
+        # Reduce pending sell goals only when we successfully sell
+        if sized.side == OrderSide.SELL:
+            store.reduce_goal(
+                signal.target.label, signal.market_id, signal.asset_id, filled,
+            )
         # Check for partial fill — unfilled sell remainder becomes a goal
         if (track_goals and sized.side == OrderSide.SELL
                 and filled < sized.size):
