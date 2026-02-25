@@ -167,9 +167,6 @@ class Engine:
                         )
                         continue
 
-                    # Cap delta at what we actually hold
-                    sell_delta = min(abs(net), our_pos.size)
-
                     synthetic = Signal(
                         signal_type=SignalType.SELL,
                         target=target,
@@ -177,7 +174,7 @@ class Engine:
                         market_id=goal["market_id"],
                         asset_id=goal["asset_id"],
                         outcome=goal["outcome"],
-                        target_delta=sell_delta,
+                        target_delta=abs(net),
                         target_prev_size=0.0,
                         target_price=goal["vwap"],
                         detected_at=datetime.now(timezone.utc),
