@@ -33,6 +33,9 @@ Required variables:
 # Start the bot (dry-run mode by default)
 python -m prediction_mirror run
 
+# Run without live dashboard (log output)
+python -m prediction_mirror run --no-dashboard
+
 # Run tests
 pytest
 
@@ -52,11 +55,10 @@ ruff check prediction_mirror/ tests/
 prediction_mirror/      Main package
   models/               Domain data types (dataclasses)
   platforms/            Platform adapters (Polymarket, etc.)
-  engine/               Core logic (platform-agnostic)
+  engine/               Core logic (monitor, strategy, executor, redeemer, reconciliation)
   store/                SQLite persistence
-  dashboard/            CLI status display (rich)
+  dashboard/            Rich terminal display with live updates
   utils/                Shared utilities
-tests/                  Test suite (214 tests, 88% coverage)
+tests/                  Test suite (236 tests, 80%+ coverage)
 docs/                   User-facing documentation
-.claude/plans/          Design specs and implementation plans
 ```
