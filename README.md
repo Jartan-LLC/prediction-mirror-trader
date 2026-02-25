@@ -115,6 +115,8 @@ Contributions are welcome. This project was built as a solo effort and is unlike
 
 Areas that would benefit from contribution:
 - Live trading testing and hardening
+- Sizing algorithm improvements (conviction model, sell reconciliation strategy)
+- Code cleanliness and refactoring (this was largely vibe-coded with AI assistance)
 - Additional platform adapters (Kalshi, etc.)
 - Interactive Textual-based dashboard
 - Position reconciliation for missed buys
