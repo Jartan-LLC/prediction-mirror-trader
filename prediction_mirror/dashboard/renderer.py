@@ -17,13 +17,19 @@ from prediction_mirror.dashboard.portfolio_view import (
 )
 
 
-def render_header(uptime: str, dry_run: bool, target_count: int) -> Text:
+def render_header(
+    uptime: str, dry_run: bool, target_count: int, total_pnl: float | None = None,
+) -> Text:
     mode = "[DRY RUN]" if dry_run else "[LIVE]"
     header = Text()
     header.append("PREDICTION MIRROR TRADER  ", style="bold white")
     header.append(mode, style="bold yellow" if dry_run else "bold red")
     header.append(f"  {target_count} targets", style="dim")
     header.append(f"  |  Uptime: {uptime}", style="dim")
+    if total_pnl is not None:
+        pnl_style = "bold green" if total_pnl >= 0 else "bold red"
+        sign = "+" if total_pnl >= 0 else ""
+        header.append(f"  |  P&L: {sign}${total_pnl:.2f}", style=pnl_style)
     return header
 
 
@@ -44,7 +50,20 @@ def render_dashboard(
     trades = trades or []
     goals = goals or []
     errors = errors or []
-    header = render_header(uptime, dry_run, target_count)
+    # Calculate total P&L from positions with known prices
+    total_pnl = None
+    if price_map and positions:
+        pnl_sum = 0.0
+        has_prices = False
+        for pos in positions:
+            cur = price_map.get(pos.asset_id)
+            if cur is not None and cur > 0:
+                pnl_sum += (pos.size * cur) - pos.total_cost
+                has_prices = True
+        if has_prices:
+            total_pnl = pnl_sum
+
+    header = render_header(uptime, dry_run, target_count, total_pnl)
     alloc_table = render_allocation_table(allocation_summary)
     pos_table = render_positions_table(positions, price_map=price_map)
     trade_table = render_recent_trades(trades)
