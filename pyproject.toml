@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "prediction-mirror-trader"
-version = "0.0.1"
+version = "0.1.0"
 description = "Platform-agnostic prediction market mirror trading bot"
 license = "AGPL-3.0-or-later"
 requires-python = ">=3.12"
