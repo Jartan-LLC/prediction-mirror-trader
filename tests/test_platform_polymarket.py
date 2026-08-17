@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import traceback
 from datetime import datetime, timezone
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -15,7 +16,11 @@ from prediction_mirror.models.signal import Signal, SignalType
 from prediction_mirror.models.target import TargetConfig
 from prediction_mirror.platforms.errors import FatalError, TransientError
 from prediction_mirror.platforms.polymarket.adapter import PolymarketAdapter
-from prediction_mirror.platforms.polymarket.config import DATA_API_URL
+from prediction_mirror.platforms.polymarket.config import (
+    DATA_API_URL,
+    load_private_key,
+    redact_key,
+)
 from prediction_mirror.platforms.polymarket.data_api import fetch_positions, fetch_portfolio_value
 
 NOW = datetime(2025, 6, 15, 12, 0, 0, tzinfo=timezone.utc)
@@ -431,6 +436,114 @@ class TestAdapterRedemption:
         assert TEST_KEY not in message
         assert "ab" * 32 not in message
         assert "[REDACTED]" in message
+
+
+# ── initialize() Error Boundary Tests ──
+
+
+def _rendered_traceback(exc: BaseException) -> str:
+    """What Python's default excepthook would print for `exc`, cause chain and all."""
+    return "".join(
+        traceback.format_exception(type(exc), exc, exc.__traceback__)
+    )
+
+
+class TestInitializeErrorBoundaries:
+    """Neither initialize() boundary may carry key material out of the adapter.
+
+    Both are uncontained: a FatalError raised here escapes to the excepthook,
+    which walks __cause__ and prints the library exception in full. Redacting
+    the message is therefore only half the fix — the chain has to be cut too.
+    """
+
+    @pytest.fixture
+    def bare_adapter(self, mock_w3):
+        """No pmxt client, so initialize() takes the real pmxt construction path."""
+        return PolymarketAdapter(
+            private_key=TEST_KEY,
+            rpc_url="https://polygon-rpc.com",
+            pmxt_client=None,
+            w3=mock_w3,
+            http_client=httpx.AsyncClient(),
+        )
+
+    @pytest.mark.asyncio
+    async def test_pmxt_boundary_does_not_carry_the_key(self, bare_adapter):
+        with patch("pmxt.Polymarket", side_effect=ValueError(f"bad key: {TEST_KEY}")):
+            with pytest.raises(FatalError) as exc:
+                await bare_adapter.initialize()
+
+        rendered = _rendered_traceback(exc.value)
+        assert TEST_KEY not in rendered
+        assert "ab" * 32 not in rendered
+        assert "[REDACTED]" in str(exc.value)
+
+    @pytest.mark.asyncio
+    async def test_from_key_boundary_does_not_carry_the_key(self, adapter, mock_w3):
+        """The malformed-key path — where a crypto library is likeliest to echo it."""
+        mock_w3.eth.account.from_key = MagicMock(
+            side_effect=ValueError(f"invalid key material: {TEST_KEY}")
+        )
+        adapter._private_key = TEST_KEY
+
+        with pytest.raises(FatalError) as exc:
+            await adapter.initialize()
+
+        rendered = _rendered_traceback(exc.value)
+        assert TEST_KEY not in rendered
+        assert "ab" * 32 not in rendered
+        assert "[REDACTED]" in str(exc.value)
+
+    @pytest.mark.asyncio
+    async def test_boundaries_suppress_the_cause_chain(self, adapter, mock_w3):
+        """`from None` is what stops the excepthook, not the redaction."""
+        mock_w3.eth.account.from_key = MagicMock(
+            side_effect=ValueError(f"invalid key material: {TEST_KEY}")
+        )
+        adapter._private_key = TEST_KEY
+
+        with pytest.raises(FatalError) as exc:
+            await adapter.initialize()
+
+        assert exc.value.__cause__ is None
+        assert exc.value.__suppress_context__ is True
+
+    @pytest.mark.asyncio
+    async def test_an_uppercase_key_is_still_redacted(self, adapter, mock_w3):
+        """A key that reached us un-normalized must not slip past the match."""
+        upper = "0x" + "AB" * 32
+        mock_w3.eth.account.from_key = MagicMock(
+            side_effect=ValueError(f"invalid key material: {upper}")
+        )
+        adapter._private_key = upper
+
+        with pytest.raises(FatalError) as exc:
+            await adapter.initialize()
+
+        assert "AB" * 32 not in str(exc.value)
+        assert "[REDACTED]" in str(exc.value)
+
+
+# ── Key Handling Tests ──
+
+
+class TestKeyHandling:
+    def test_load_private_key_normalizes(self, monkeypatch):
+        monkeypatch.setenv("POLYMARKET_PRIVATE_KEY", f"  0x{'AB' * 32}\n")
+        assert load_private_key() == "0x" + "ab" * 32
+
+    def test_a_whitespace_only_key_is_treated_as_unset(self, monkeypatch):
+        monkeypatch.setenv("POLYMARKET_PRIVATE_KEY", "   \n")
+        with pytest.raises(EnvironmentError):
+            load_private_key()
+
+    def test_redact_key_is_case_and_prefix_insensitive(self):
+        key = "0x" + "ab" * 32
+        assert redact_key(f"saw {'AB' * 32} here", key) == "saw [REDACTED] here"
+        assert redact_key(f"saw {key} here", key) == "saw 0x[REDACTED] here"
+
+    def test_redact_key_leaves_a_message_alone_when_there_is_no_key(self):
+        assert redact_key("nothing to hide", "") == "nothing to hide"
 
 
 # ── Registry Tests ──

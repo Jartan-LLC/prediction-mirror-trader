@@ -16,6 +16,7 @@ from prediction_mirror.platforms.polymarket.config import (
     USDC_DECIMALS,
     load_private_key,
     load_rpc_url,
+    redact_key,
 )
 import logging
 
@@ -59,7 +60,13 @@ class PolymarketAdapter(PlatformAdapter):
                     pmxt.Polymarket, private_key=self._private_key
                 )
             except Exception as e:
-                raise FatalError(f"Failed to initialize pmxt: {e}") from e
+                # `from None` on purpose: the key is in scope here, and an
+                # uncaught FatalError reaches an excepthook that prints the
+                # cause in full — redacting the message alone would not stop it.
+                raise FatalError(
+                    f"Failed to initialize pmxt: "
+                    f"{redact_key(str(e), self._private_key)}"
+                ) from None
 
         if self._w3 is None:
             try:
@@ -74,7 +81,11 @@ class PolymarketAdapter(PlatformAdapter):
             account = self._w3.eth.account.from_key(self._private_key)
             self._address = account.address
         except Exception as e:
-            raise FatalError(f"Invalid private key: {e}") from e
+            # The malformed-key path — the one place a crypto library is most
+            # likely to echo the offending value back. Same `from None` rule.
+            raise FatalError(
+                f"Invalid private key: {redact_key(str(e), self._private_key)}"
+            ) from None
 
         logger.info(f"Initialized Polymarket adapter for {self._address}")
 

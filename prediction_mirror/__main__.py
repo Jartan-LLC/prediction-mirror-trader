@@ -77,8 +77,21 @@ def run(ctx, no_dashboard):
                 sys.exit(1)
 
     async def _run():
-        for adapter in adapters.values():
-            await adapter.initialize()
+        for platform, adapter in adapters.items():
+            try:
+                await adapter.initialize()
+            except Exception as e:
+                # Adapter initialization holds credential material in scope, and
+                # an exception that escapes here reaches Python's default
+                # excepthook, which walks __cause__ and prints every frame of it.
+                # Report the message and exit; SystemExit prints no traceback.
+                # The type name is kept so an unexpected failure is still
+                # distinguishable from a FatalError without the traceback.
+                console.print(
+                    f"[red]Failed to initialize {platform} adapter: "
+                    f"{type(e).__name__}: {e}[/red]"
+                )
+                raise SystemExit(1) from None
 
         engine = Engine(store, adapters)
 
