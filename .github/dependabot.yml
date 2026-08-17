@@ -1,0 +1,31 @@
+version: 2
+
+updates:
+  # Deployed runtime image. Covers both FROM lines in the root Dockerfile:
+  # ghcr.io/astral-sh/uv (build stage) and python:3.12-slim (runtime base).
+  # Both are digest-pinned; this updater is what stops the pins going stale.
+  # Without it, a frozen python:3.12-slim digest ships every operator build
+  # from a base that has stopped receiving CVE rebuilds. See SEC-2026-0064.
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "build"
+
+  # Devcontainer Features and .devcontainer/devcontainer-lock.json. The five
+  # feature pins landed with SEC-2026-0055 and are equally unmaintained without
+  # an updater. Directory is "/" by design: the devcontainers fetcher searches
+  # .devcontainer/ and .devcontainer/*/ from the repository root.
+  #
+  # This ecosystem updates Features only. The devcontainer's own base image
+  # (mcr.microsoft.com/devcontainers/python@sha256:...) is not covered by any
+  # Dependabot ecosystem — see the note on JAR-458.
+  - package-ecosystem: "devcontainers"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "build"
