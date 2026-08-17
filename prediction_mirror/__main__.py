@@ -9,6 +9,7 @@ import sys
 import click
 from dotenv import load_dotenv
 from rich.console import Console
+from rich.markup import escape
 from rich.table import Table
 
 from prediction_mirror.store import Store, init_db
@@ -72,13 +73,30 @@ def run(ctx, no_dashboard):
                 adapters[target.platform] = cls.from_env()
             except Exception as e:
                 console.print(
-                    f"[red]Failed to create adapter for {target.platform}: {e}[/red]"
+                    f"[red]Failed to create adapter for {target.platform}: "
+                    f"{escape(str(e))}[/red]"
                 )
                 sys.exit(1)
 
     async def _run():
-        for adapter in adapters.values():
-            await adapter.initialize()
+        for platform, adapter in adapters.items():
+            try:
+                await adapter.initialize()
+            except Exception as e:
+                # Adapter initialization holds credential material in scope, and
+                # an exception that escapes here reaches Python's default
+                # excepthook, which walks __cause__ and prints every frame of it.
+                # Report the message and exit; SystemExit prints no traceback.
+                # The type name is kept so an unexpected failure is still
+                # distinguishable from a FatalError without the traceback.
+                # escape() the library message: an unbalanced tag in it would
+                # raise MarkupError out of this handler and print the very
+                # traceback the handler exists to prevent.
+                console.print(
+                    f"[red]Failed to initialize {platform} adapter: "
+                    f"{type(e).__name__}: {escape(str(e))}[/red]"
+                )
+                raise SystemExit(1) from None
 
         engine = Engine(store, adapters)
 

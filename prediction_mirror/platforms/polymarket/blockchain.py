@@ -11,6 +11,7 @@ from prediction_mirror.platforms.polymarket.config import (
     CTF_EXCHANGE,
     USDC_ADDRESS,
     USDC_DECIMALS,
+    redact_key,
 )
 logger = logging.getLogger(__name__)
 
@@ -86,21 +87,6 @@ async def check_approvals(w3: Any, owner: str) -> bool:
         return allowance > 0
     except Exception as e:
         raise TransientError(f"Failed to check approvals: {e}") from e
-
-
-def redact_key(message: str, private_key: str) -> str:
-    """Strip private key material out of a message before it is raised or logged.
-
-    web3.py and eth-account do not echo the key in their current error strings,
-    but that is not a guarantee they keep; this makes it one on our side.
-    """
-    if not private_key:
-        return message
-    redacted = message.replace(private_key, "[REDACTED]")
-    bare = private_key[2:] if private_key.startswith("0x") else private_key
-    if bare:
-        redacted = redacted.replace(bare, "[REDACTED]")
-    return redacted
 
 
 async def redeem_positions(
