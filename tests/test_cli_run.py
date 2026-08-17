@@ -43,6 +43,26 @@ def failing_adapter(monkeypatch):
     return adapter
 
 
+@pytest.fixture
+def markup_failing_adapter(monkeypatch):
+    """As above, but the library message also carries an unbalanced rich tag."""
+    w3 = MagicMock()
+    w3.eth.account.from_key = MagicMock(
+        side_effect=ValueError(f"invalid key material [/close] {TEST_KEY}")
+    )
+    adapter = PolymarketAdapter(
+        private_key=TEST_KEY,
+        rpc_url="https://polygon-rpc.com",
+        pmxt_client=MagicMock(),
+        w3=w3,
+        http_client=httpx.AsyncClient(),
+    )
+    monkeypatch.setattr(
+        PolymarketAdapter, "from_env", classmethod(lambda cls: adapter)
+    )
+    return adapter
+
+
 class TestRunStartupFailure:
     """A failed adapter startup must not print a traceback out of `__main__`.
 
@@ -87,3 +107,18 @@ class TestRunStartupFailure:
         assert isinstance(result.exception, SystemExit)
         assert result.exception.__cause__ is None
         assert result.exception.__suppress_context__ is True
+
+    def test_markup_in_a_library_message_does_not_reopen_the_traceback(
+        self, tmp_path, markup_failing_adapter
+    ):
+        """An unbalanced tag would raise MarkupError out of the handler itself."""
+        db = str(tmp_path / "test.db")
+        runner = CliRunner()
+        _add_target(runner, db)
+
+        result = runner.invoke(cli, ["--db", db, "run", "--no-dashboard"])
+
+        assert result.exit_code == 1
+        assert isinstance(result.exception, SystemExit)
+        assert "Traceback" not in result.output
+        assert "ab" * 32 not in "".join(result.output.split())

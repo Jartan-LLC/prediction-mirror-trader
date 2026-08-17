@@ -9,6 +9,7 @@ import sys
 import click
 from dotenv import load_dotenv
 from rich.console import Console
+from rich.markup import escape
 from rich.table import Table
 
 from prediction_mirror.store import Store, init_db
@@ -72,7 +73,8 @@ def run(ctx, no_dashboard):
                 adapters[target.platform] = cls.from_env()
             except Exception as e:
                 console.print(
-                    f"[red]Failed to create adapter for {target.platform}: {e}[/red]"
+                    f"[red]Failed to create adapter for {target.platform}: "
+                    f"{escape(str(e))}[/red]"
                 )
                 sys.exit(1)
 
@@ -87,9 +89,12 @@ def run(ctx, no_dashboard):
                 # Report the message and exit; SystemExit prints no traceback.
                 # The type name is kept so an unexpected failure is still
                 # distinguishable from a FatalError without the traceback.
+                # escape() the library message: an unbalanced tag in it would
+                # raise MarkupError out of this handler and print the very
+                # traceback the handler exists to prevent.
                 console.print(
                     f"[red]Failed to initialize {platform} adapter: "
-                    f"{type(e).__name__}: {e}[/red]"
+                    f"{type(e).__name__}: {escape(str(e))}[/red]"
                 )
                 raise SystemExit(1) from None
 
