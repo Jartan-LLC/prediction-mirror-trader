@@ -29,11 +29,17 @@ Poll /activity → Detect trades → Aggregate fragments → Size orders → Exe
 
 ## Quick Start
 
+Requires Python 3.12+, Node.js (for the pmxt sidecar server), and
+[uv](https://docs.astral.sh/uv/getting-started/installation/), which is this
+project's installer in place of pip.
+
 ```bash
 # Clone and install
 git clone https://github.com/Jartan-LLC/prediction-mirror-trader.git
 cd prediction-mirror-trader
-pip install -e ".[dev]"
+uv venv
+source .venv/bin/activate
+uv pip install -e ".[dev]"
 
 # Configure secrets
 cp .env.example .env

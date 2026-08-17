@@ -8,12 +8,20 @@
 
 ## Manual Setup
 
-Requires Python 3.12+ and Node.js (for the pmxt sidecar server).
+Requires Python 3.12+, Node.js (for the pmxt sidecar server), and
+[uv](https://docs.astral.sh/uv/getting-started/installation/), which is this
+project's installer in place of pip.
 
 ```bash
-# Install in development mode
-pip install -e ".[dev]"
+# Create the project venv and install in development mode
+uv venv
+source .venv/bin/activate
+uv pip install -e ".[dev]"
 ```
+
+The devcontainer installs into the container's own interpreter instead, with
+`uv pip install --system` — the container is the isolation there, so it needs no
+venv.
 
 ## Environment
 
