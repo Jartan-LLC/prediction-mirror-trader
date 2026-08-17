@@ -88,12 +88,32 @@ async def check_approvals(w3: Any, owner: str) -> bool:
         raise TransientError(f"Failed to check approvals: {e}") from e
 
 
+def redact_key(message: str, private_key: str) -> str:
+    """Strip private key material out of a message before it is raised or logged.
+
+    web3.py and eth-account do not echo the key in their current error strings,
+    but that is not a guarantee they keep; this makes it one on our side.
+    """
+    if not private_key:
+        return message
+    redacted = message.replace(private_key, "[REDACTED]")
+    bare = private_key[2:] if private_key.startswith("0x") else private_key
+    if bare:
+        redacted = redacted.replace(bare, "[REDACTED]")
+    return redacted
+
+
 async def redeem_positions(
-    w3: Any, address: str, condition_id: str
+    w3: Any, address: str, condition_id: str, private_key: str
 ) -> bool:
     """Redeem resolved positions via ConditionalTokens contract."""
     try:
         ct = w3.eth.contract(address=CONDITIONAL_TOKENS, abi=CONDITIONAL_TOKENS_ABI)
+        # build_transaction fills the fee fields and chainId, but not the nonce —
+        # only the standalone fill_nonce helper does, and it is not on this path.
+        nonce = await asyncio.to_thread(
+            w3.eth.get_transaction_count, address, "pending"
+        )
         # Build the transaction
         tx = ct.functions.redeemPositions(
             USDC_ADDRESS,
@@ -103,9 +123,12 @@ async def redeem_positions(
         ).build_transaction({
             "from": address,
             "gas": 300_000,
+            "nonce": nonce,
         })
         # Sign and send
-        signed = await asyncio.to_thread(w3.eth.account.sign_transaction, tx, None)
+        signed = await asyncio.to_thread(
+            w3.eth.account.sign_transaction, tx, private_key
+        )
         tx_hash = await asyncio.to_thread(w3.eth.send_raw_transaction, signed.raw_transaction)
         receipt = await asyncio.to_thread(w3.eth.wait_for_transaction_receipt, tx_hash, timeout=60)
         success = receipt["status"] == 1
@@ -115,4 +138,7 @@ async def redeem_positions(
             logger.warning(f"Redemption reverted for {condition_id}: tx={tx_hash.hex()}")
         return success
     except Exception as e:
-        raise FatalError(f"Redemption failed for {condition_id}: {e}") from e
+        raise FatalError(
+            f"Redemption failed for {condition_id}: "
+            f"{redact_key(str(e), private_key)}"
+        ) from e

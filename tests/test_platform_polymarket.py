@@ -331,6 +331,108 @@ class TestAdapterWallet:
         assert wallet.approvals_ok is True
 
 
+# ── Redemption Tests ──
+
+
+TEST_KEY = "0x" + "ab" * 32
+
+
+@pytest.fixture
+def redeem_w3(mock_w3):
+    """mock_w3 with a ConditionalTokens contract wired for a successful redemption."""
+    ct_contract = MagicMock()
+    ct_contract.functions.redeemPositions.return_value.build_transaction.return_value = {
+        "from": "0xTestAddress123",
+        "gas": 300_000,
+        "nonce": 7,
+    }
+    mock_w3.eth.contract = MagicMock(return_value=ct_contract)
+    mock_w3.eth.get_transaction_count = MagicMock(return_value=7)
+    mock_w3.eth.account.sign_transaction = MagicMock(
+        return_value=SimpleNamespace(raw_transaction=b"\xde\xad")
+    )
+    mock_w3.eth.send_raw_transaction = MagicMock(return_value=MagicMock())
+    mock_w3.eth.wait_for_transaction_receipt = MagicMock(return_value={"status": 1})
+    return mock_w3
+
+
+@pytest.fixture
+def redeem_adapter(mock_pmxt, redeem_w3):
+    return PolymarketAdapter(
+        private_key=TEST_KEY,
+        rpc_url="https://polygon-rpc.com",
+        pmxt_client=mock_pmxt,
+        w3=redeem_w3,
+        http_client=httpx.AsyncClient(),
+    )
+
+
+class TestAdapterRedemption:
+    @pytest.mark.asyncio
+    async def test_signs_with_real_key_material(self, redeem_adapter, redeem_w3):
+        await redeem_adapter.initialize()
+        pos = OurPosition(
+            market_id="0x" + "cd" * 32,
+            asset_id="tok_1",
+            platform="polymarket",
+            outcome="Yes",
+            size=10.0,
+            avg_entry_price=0.5,
+            total_cost=5.0,
+            realized_pnl=0.0,
+            source_target="Whale",
+            dry_run=False,
+            updated_at=NOW,
+        )
+
+        assert await redeem_adapter.redeem_if_needed(pos.market_id, pos) is True
+
+        _tx, key = redeem_w3.eth.account.sign_transaction.call_args[0]
+        assert key is not None
+        assert key == TEST_KEY
+
+    @pytest.mark.asyncio
+    async def test_transaction_carries_a_nonce(self, redeem_adapter, redeem_w3):
+        await redeem_adapter.initialize()
+        from prediction_mirror.platforms.polymarket.blockchain import redeem_positions
+
+        await redeem_positions(redeem_w3, "0xTestAddress123", "0x" + "cd" * 32, TEST_KEY)
+
+        ct = redeem_w3.eth.contract.return_value
+        build = ct.functions.redeemPositions.return_value.build_transaction
+        assert build.call_args[0][0]["nonce"] == 7
+
+    @pytest.mark.asyncio
+    async def test_reverted_receipt_returns_false(self, redeem_adapter, redeem_w3):
+        redeem_w3.eth.wait_for_transaction_receipt = MagicMock(
+            return_value={"status": 0}
+        )
+        from prediction_mirror.platforms.polymarket.blockchain import redeem_positions
+
+        result = await redeem_positions(
+            redeem_w3, "0xTestAddress123", "0x" + "cd" * 32, TEST_KEY
+        )
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_key_never_reaches_the_error_message(self, redeem_w3):
+        """A signing library that echoed the key must not leak it through FatalError."""
+        redeem_w3.eth.account.sign_transaction = MagicMock(
+            side_effect=ValueError(f"bad key: {TEST_KEY}")
+        )
+        from prediction_mirror.platforms.polymarket.blockchain import redeem_positions
+
+        with pytest.raises(FatalError) as exc:
+            await redeem_positions(
+                redeem_w3, "0xTestAddress123", "0x" + "cd" * 32, TEST_KEY
+            )
+
+        message = str(exc.value)
+        assert TEST_KEY not in message
+        assert "ab" * 32 not in message
+        assert "[REDACTED]" in message
+
+
 # ── Registry Tests ──
 
 
