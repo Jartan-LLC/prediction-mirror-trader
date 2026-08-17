@@ -11,20 +11,25 @@ sudo apt-get install nodejs -y
 echo "📦 Installing pnpm package manager..."
 sudo npm install -g pnpm
 
-# Install Python dependencies from all requirements.txt files
+# Pinned inline: no CI and no Dependabot here, so a ci/requirements.txt would
+# have nothing reading or bumping it. Keep in step with the Dockerfile's uv tag.
+UV_VERSION=0.12.5
+echo "🐍 Installing uv ${UV_VERSION}..."
+pip install "uv==${UV_VERSION}" || echo "Warning: uv install failed" >&2
+
 echo "Installing Python dependencies..."
 while IFS= read -r -d '' req_file; do
     echo "   Installing from $req_file..."
-    pip install -r "$req_file"
-done < <(find . -name "requirements.txt" -type f -print0 2>/dev/null)
+    uv pip install --system -r "$req_file"
+done < <(find . -name "requirements.txt" -not -path "*/.venv/*" -not -path "*/venv/*" -not -path "*/.tox/*" -type f -print0 2>/dev/null)
 
 # Install Python dependencies from pyproject.toml files (editable installs)
 echo "Installing Python packages from pyproject.toml..."
 while IFS= read -r -d '' pyproject_file; do
     dir=$(dirname "$pyproject_file")
     echo "   Installing from $dir..."
-    pip install -e "$dir"
-done < <(find . -name "pyproject.toml" -type f -print0 2>/dev/null)
+    uv pip install --system -e "$dir"
+done < <(find . -name "pyproject.toml" -not -path "*/.venv/*" -not -path "*/venv/*" -not -path "*/.tox/*" -type f -print0 2>/dev/null)
 
 # Install Claude Code plugins (fallback for fresh Docker volumes)
 if command -v claude &> /dev/null; then
