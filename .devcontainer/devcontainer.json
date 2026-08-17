@@ -1,11 +1,18 @@
 {
-  "image": "mcr.microsoft.com/devcontainers/python:3-3.12",
+  "image": "mcr.microsoft.com/devcontainers/python@sha256:729bc20302313ef1159ec1e670ca53a2969ed8c720e023fc2bdda95f1644a8e0",
   "mounts": [
     "source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,type=bind,readonly",
     "source=claude-data,target=/home/vscode/.claude,type=volume"
   ],
   "features": {
-    "ghcr.io/stu-bell/devcontainer-features/claude-code:0": {},
+    // Installed as root, one stage before postCreateCommand — @anthropic-ai
+    // ends up unwritable, so Claude Code's own auto-update fails. Accepted
+    // trade-off: memcp carries the same shape, and pinning by digest closes
+    // the root-at-build supply-chain path this feature ships from.
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1": {},
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "lts"
+    },
     "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
       "moby": false
     },
