@@ -73,6 +73,15 @@ def test_setup_sh_does_not_install_unpinned_marketplace():
     )
 
 
+def test_no_host_ssh_bind_mount():
+    mounts = _devcontainer_json().get("mounts", [])
+    assert not any(".ssh" in mount for mount in mounts), (
+        "devcontainer.json mounts the host's entire ~/.ssh directory into the "
+        "container; readonly bounds writing the host's private keys, not "
+        "reading them (devcontainer.json:4)"
+    )
+
+
 def test_claude_settings_does_not_enable_unpinned_marketplace():
     settings = _claude_settings()
     enabled = settings.get("enabledPlugins", {})
