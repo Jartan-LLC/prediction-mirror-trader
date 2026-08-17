@@ -195,7 +195,9 @@ class PolymarketAdapter(PlatformAdapter):
             return False
 
     async def redeem_if_needed(self, market_id: str, position: OurPosition) -> bool:
-        return await blockchain.redeem_positions(self._w3, self._address, market_id)
+        return await blockchain.redeem_positions(
+            self._w3, self._address, market_id, self._private_key
+        )
 
     # ── Metadata ──
 

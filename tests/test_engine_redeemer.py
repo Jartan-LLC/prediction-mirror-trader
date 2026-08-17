@@ -153,3 +153,73 @@ class TestRunRedeemerPass:
 
         redeemed = [e for e in events if e[0] == "on_redeemed"]
         assert len(redeemed) == 1
+
+    @pytest.mark.asyncio
+    async def test_failed_redemption_leaves_position_and_skips_dispatch(
+        self, store, mock_adapter
+    ):
+        from prediction_mirror.engine.redeemer import run_redeemer_pass
+
+        mock_adapter.redeem_if_needed.return_value = False
+        pos = _position(dry_run=False, outcome="Yes", size=10.0, avg_entry=0.60)
+        store.upsert_position(pos)
+
+        events = []
+        def dispatch(event, *args):
+            events.append((event, args))
+
+        await run_redeemer_pass({"polymarket": mock_adapter}, store, dispatch=dispatch)
+
+        # Nothing was redeemed, so the position stands and no event fires.
+        updated = store.get_position("cond_1", "tok_1", "Whale")
+        assert updated.size == 10.0
+        assert updated.realized_pnl == pytest.approx(0.0)
+        assert events == []
+
+    @pytest.mark.asyncio
+    async def test_failed_redemption_does_not_reuse_a_previous_pnl(
+        self, store, mock_adapter
+    ):
+        """A False redemption after a successful one must not dispatch the earlier P&L."""
+        from prediction_mirror.engine.redeemer import run_redeemer_pass
+
+        first = _position(dry_run=False, outcome="Yes", size=10.0, avg_entry=0.60)
+        second = OurPosition(
+            market_id="cond_2",
+            asset_id="tok_2",
+            platform="polymarket",
+            outcome="Yes",
+            size=20.0,
+            avg_entry_price=0.30,
+            total_cost=6.0,
+            realized_pnl=0.0,
+            source_target="Whale",
+            dry_run=False,
+            updated_at=NOW,
+        )
+        store.upsert_position(first)
+        store.upsert_position(second)
+
+        # cond_1 redeems, cond_2 reports failure — keyed by id, not call order.
+        async def redeem(market_id, position):
+            return market_id == "cond_1"
+
+        async def fetch(market_id):
+            market = _resolved_market("Yes")
+            market.market_id = market_id
+            return market
+
+        mock_adapter.redeem_if_needed.side_effect = redeem
+        mock_adapter.fetch_market.side_effect = fetch
+
+        events = []
+        def dispatch(event, *args):
+            events.append((event, args))
+
+        await run_redeemer_pass({"polymarket": mock_adapter}, store, dispatch=dispatch)
+
+        redeemed = [e for e in events if e[0] == "on_redeemed"]
+        assert len(redeemed) == 1
+        assert redeemed[0][1][0].market_id == "cond_1"
+        # cond_2 is untouched, not carrying cond_1's P&L
+        assert store.get_position("cond_2", "tok_2", "Whale").size == 20.0

@@ -44,14 +44,17 @@ async def run_redeemer_pass(
         else:
             try:
                 success = await adapter.redeem_if_needed(pos.market_id, pos)
-                if success:
-                    pnl = _calculate_pnl(pos, market)
-                    _record_redemption(store, pos, pnl)
-                else:
-                    logger.warning(f"Redemption failed for {pos.market_id}")
             except PlatformError as e:
                 logger.error(f"Redemption error for {pos.market_id}: {e}")
                 continue
+
+            if not success:
+                # Nothing was redeemed, so there is no P&L to record or dispatch.
+                logger.warning(f"Redemption failed for {pos.market_id}")
+                continue
+
+            pnl = _calculate_pnl(pos, market)
+            _record_redemption(store, pos, pnl)
 
         if dispatch:
             updated = store.get_position(pos.market_id, pos.asset_id, pos.source_target)
