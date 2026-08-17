@@ -10,7 +10,7 @@
     // trade-off: memcp carries the same shape, and pinning by digest closes
     // the root-at-build supply-chain path this feature ships from.
     "ghcr.io/anthropics/devcontainer-features/claude-code:1": {},
-    "ghcr.io/devcontainers/features/node:1": {
+    "ghcr.io/devcontainers/features/node:2": {
       "version": "lts"
     },
     "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
