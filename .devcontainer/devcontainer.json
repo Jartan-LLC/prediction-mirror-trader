@@ -1,7 +1,6 @@
 {
   "image": "mcr.microsoft.com/devcontainers/python@sha256:729bc20302313ef1159ec1e670ca53a2969ed8c720e023fc2bdda95f1644a8e0",
   "mounts": [
-    "source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,type=bind,readonly",
     "source=claude-data,target=/home/vscode/.claude,type=volume"
   ],
   "features": {
