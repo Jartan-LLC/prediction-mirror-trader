@@ -4,7 +4,7 @@
 # wallet's private key at runtime — a floating tag is repointable by its
 # publisher. See SEC-2026-0064; .github/dependabot.yml is what keeps these
 # digests from going stale.
-FROM ghcr.io/astral-sh/uv:0.12.5@sha256:e85be844203885286c60ffad8a858d48afb6c5a5c237ca0e67f12e74b8f174b1 AS uv-bin
+FROM ghcr.io/astral-sh/uv:0.12.8@sha256:d1cbaeadc234fe19c0d93daabcf5e98738cd93c6d1dd4918ef6aa30735feb23a AS uv-bin
 
 FROM python:3.12-slim@sha256:2c941e860699f878900b0edc2403613c234d4b32eda3cc9fa7036991a2a63c4a
 COPY --from=uv-bin /uv /uvx /bin/
